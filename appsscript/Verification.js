@@ -32,20 +32,32 @@ function stage1b_verifyFacts(scriptId) {
   const rowIdx = findRowIndexById_(SHEET.SCRIPT, scriptId, COL_SCRIPT.ID);
   if (rowIdx < 0) return false;
 
+  // Opinion pieces (angle "perspective") are judged differently: subjective
+  // picks don't need a source, but any concrete factual claim still must.
+  const ideaRow = findRowById_(SHEET.IDEA, scriptId, COL_IDEA.ID);
+  const angle = ideaRow ? String(ideaRow[COL_IDEA.ANGLE - 1] || "") : "";
+  const isPerspective = angle.toLowerCase() === "perspective";
+
   const rankItems = JSON.parse(sh.getRange(rowIdx, COL_SCRIPT.RANK_ITEMS_JSON).getValue());
   const lean = rankItems.map(function (it) { return { rank: it.rank, name: it.name, fact: it.fact }; });
 
-  const prompt =
-    "You are fact-checking a ranking video BEFORE publication. For EACH item below, use web search to verify the claim.\n\n" +
-    "Rules:\n" +
-    "- If the claim is accurate, keep it but correct any numbers to match a reputable, current source.\n" +
-    "- If it is wrong, outdated, or you cannot find a reputable source, REPLACE it with a DIFFERENT, specific, verifiable fact about the same item.\n" +
-    "- Every item MUST include a real source URL you actually consulted.\n" +
-    "- Each 'fact' = ONE punchy stat/claim, <= 14 words, no filler, no [VERIFY] tags.\n" +
-    "- 'on_screen_text' = an even shorter caption version, <= 6 words.\n\n" +
-    "Items:\n" + JSON.stringify(lean) + "\n\n" +
+  const head = "You are fact-checking a ranking video BEFORE publication. Items:\n" + JSON.stringify(lean) + "\n\n";
+  const tail =
+    "\nEach 'fact' <= 14 words, no filler, no [VERIFY] tags. 'on_screen_text' <= 6 words.\n" +
     "Respond with ONLY strict JSON as your final message (no prose, no code fences):\n" +
     '{"items":[{"rank":N,"name":"...","fact":"...","on_screen_text":"...","source":"https://..."}]}';
+
+  const prompt = isPerspective
+    ? head +
+      "This is a PERSPECTIVE / opinion ranking (subjective — no objective right answer). Rules:\n" +
+      "- Subjective preferences/opinions are allowed and need NO source; set \"source\":\"\" for those.\n" +
+      "- BUT any concrete factual claim (price, date, law, record, statistic) MUST be verified with web search and corrected, or removed if false — those MUST carry a real source URL.\n" +
+      "- Keep the opinionated, first-person framing." + tail
+    : head +
+      "For EACH item, use web search to verify the claim. Rules:\n" +
+      "- If accurate, keep it but correct any numbers to a reputable, current source.\n" +
+      "- If wrong, outdated, or unsourceable, REPLACE it with a DIFFERENT, specific, verifiable fact about the same item.\n" +
+      "- Every item MUST include a real source URL you actually consulted." + tail;
 
   try {
     const raw = callClaudeWithSearch(prompt, 8);
@@ -58,13 +70,15 @@ function stage1b_verifyFacts(scriptId) {
     const verified = rankItems.map(function (it) {
       const v = byRank[it.rank];
       if (!v) throw new Error("Verifier skipped rank " + it.rank);
-      if (!v.source || !/^https?:\/\//.test(v.source)) throw new Error("Missing source for rank " + it.rank);
+      const hasSource = v.source && /^https?:\/\//.test(v.source);
+      // Non-perspective items must be sourced; perspective opinions may be empty.
+      if (!isPerspective && !hasSource) throw new Error("Missing source for rank " + it.rank);
       return {
         rank: it.rank,
         name: v.name || it.name,
         fact: v.fact || it.fact,
         on_screen_text: v.on_screen_text || it.on_screen_text || "",
-        source: v.source
+        source: hasSource ? v.source : ""
       };
     });
 

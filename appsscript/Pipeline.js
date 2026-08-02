@@ -47,7 +47,7 @@ function stage0_refillTopicQueue() {
     const prompt = "Suggest 3 new specific video topics for the '" + niche + "' ranking pillar.\n" +
       "Avoid these already-used titles:\n" + existing.join("\n") + "\n" +
       "Avoid these killed/underperforming sub-topics:\n" + killed.join("\n") + "\n" +
-      "Return strict JSON: {\"topics\":[{\"title\":\"...\",\"angle\":\"countdown|comparison|myth-bust\"}]}";
+      "Return strict JSON: {\"topics\":[{\"title\":\"...\",\"angle\":\"countdown|comparison|myth-bust|perspective\"}]}";
 
     try {
       const raw = callClaude(prompt, "stage0_topic_pick");

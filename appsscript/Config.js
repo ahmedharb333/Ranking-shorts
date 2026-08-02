@@ -174,6 +174,16 @@ niche is PLACES, every ranked item must be a city/town/region/island/attraction
 and it is an error to rank a whole country. If the niche is COUNTRIES, every
 ranked item must be an entire country and it is an error to rank a city or region.
 
+ANGLES (each video has one):
+- countdown — rank items #5→#1 by an objective measure (price, heat, cost, etc.).
+- comparison — head-to-head between options on concrete criteria.
+- myth-bust — correct a common misconception with facts.
+- perspective — a SUBJECTIVE, personal take ("this is what I see — no right or
+  wrong"). Frame it openly as opinion ("my pick", "hear me out", "in my view").
+  Rank by personal preference, NOT objective truth, and never present a subjective
+  preference as an established fact. Any concrete claim you DO make (a price, date,
+  law, record) must still be true and specific.
+
 FORMAT RULES (mandatory):
 - Total spoken script: 120-160 words, 30-45 seconds read aloud
 - Hook (first 1.5 seconds / first line) must state the single most surprising fact
