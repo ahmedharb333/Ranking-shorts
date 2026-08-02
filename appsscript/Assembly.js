@@ -53,6 +53,7 @@ function stage4_submitAssembly(scriptId) {
   const res = UrlFetchApp.fetch(serverBase + "/assemble/job", {
     method: "post",
     contentType: "application/json",
+    headers: { "ngrok-skip-browser-warning": "1" }, // skip ngrok free interstitial so we get JSON, not HTML
     payload: JSON.stringify({ contentId: scriptId, title: title, scenes: scenes }),
     muteHttpExceptions: true
   });
@@ -79,7 +80,10 @@ function stage4b_pollAssemblyJobs() {
 
     const jobId = data[i][COL_ASSEMBLY.JOB_ID - 1];
     try {
-      const res = UrlFetchApp.fetch(serverBase + "/assemble/job/" + jobId, { muteHttpExceptions: true });
+      const res = UrlFetchApp.fetch(serverBase + "/assemble/job/" + jobId, {
+        headers: { "ngrok-skip-browser-warning": "1" }, // skip ngrok free interstitial so we get JSON, not HTML
+        muteHttpExceptions: true
+      });
       const job = JSON.parse(res.getContentText());
 
       if (job.status === "done") {
