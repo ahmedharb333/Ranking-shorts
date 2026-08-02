@@ -1,0 +1,180 @@
+import React from "react";
+import {
+  AbsoluteFill,
+  Sequence,
+  Video,
+  Audio,
+  useCurrentFrame,
+  interpolate,
+  spring,
+  useVideoConfig,
+} from "remotion";
+
+// ── Types matching the job payload Assembly.js (Apps Script) sends. Note:
+//    server.js splits the raw scenes[] by "type" (hook/rank/cta) before
+//    building these props — this composition only ever sees "rank" scenes
+//    plus hook/cta audio pulled out separately. ──────────────────────────────
+export type Scene = {
+  rank: number;
+  name: string;
+  onScreenText: string;
+  clipUrl: string;
+  audioUrl: string;
+  audioDurationSec: number;
+};
+
+export type RankingVideoProps = {
+  title: string;
+  hook: string;
+  hookAudioUrl: string;
+  ctaAudioUrl: string;
+  scenes: Scene[];
+};
+
+const FPS = 30;
+
+// ── Rank number that pops in with a spring ────────────────────────────────────
+const RankBadge: React.FC<{ rank: number }> = ({ rank }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const scale = spring({ frame, fps, config: { damping: 12, stiffness: 180 } });
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 80,
+        left: 40,
+        fontSize: 140,
+        fontWeight: 900,
+        color: "white",
+        WebkitTextStroke: "6px black",
+        transform: `scale(${scale})`,
+        fontFamily: "Arial Black, sans-serif",
+      }}
+    >
+      #{rank}
+    </div>
+  );
+};
+
+// ── Bottom-third animated caption (the on-screen text / fact) ────────────────
+const Caption: React.FC<{ text: string }> = ({ text }) => {
+  const frame = useCurrentFrame();
+  const opacity = interpolate(frame, [0, 10], [0, 1], { extrapolateRight: "clamp" });
+  const translateY = interpolate(frame, [0, 10], [30, 0], { extrapolateRight: "clamp" });
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        bottom: 160,
+        left: 40,
+        right: 40,
+        opacity,
+        transform: `translateY(${translateY}px)`,
+        background: "rgba(0,0,0,0.65)",
+        borderRadius: 24,
+        padding: "24px 32px",
+      }}
+    >
+      <p style={{ color: "white", fontSize: 52, fontWeight: 700, fontFamily: "Arial, sans-serif", margin: 0, lineHeight: 1.25 }}>
+        {text}
+      </p>
+    </div>
+  );
+};
+
+// ── One ranked item: background clip + rank badge + caption + synced audio ──
+const RankScene: React.FC<{ scene: Scene }> = ({ scene }) => (
+  <AbsoluteFill style={{ backgroundColor: "black" }}>
+    <Video src={scene.clipUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} muted />
+    <RankBadge rank={scene.rank} />
+    <Caption text={scene.onScreenText} />
+    {scene.audioUrl ? <Audio src={scene.audioUrl} /> : null}
+  </AbsoluteFill>
+);
+
+// ── Hook screen: big bold text, no video needed, just motion + audio ────────
+const HookScene: React.FC<{ hook: string; audioUrl: string }> = ({ hook, audioUrl }) => {
+  const frame = useCurrentFrame();
+  const scale = interpolate(frame, [0, 15], [1.1, 1], { extrapolateRight: "clamp" });
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: "#111", justifyContent: "center", alignItems: "center", padding: 60 }}>
+      <p
+        style={{
+          color: "white",
+          fontSize: 88,
+          fontWeight: 900,
+          textAlign: "center",
+          fontFamily: "Arial Black, sans-serif",
+          transform: `scale(${scale})`,
+        }}
+      >
+        {hook}
+      </p>
+      {audioUrl ? <Audio src={audioUrl} /> : null}
+    </AbsoluteFill>
+  );
+};
+
+const CtaScene: React.FC<{ audioUrl: string }> = ({ audioUrl }) => (
+  <AbsoluteFill style={{ backgroundColor: "#111", justifyContent: "center", alignItems: "center" }}>
+    <p style={{ color: "white", fontSize: 60, fontWeight: 800, fontFamily: "Arial, sans-serif", textAlign: "center" }}>
+      Which one surprised you? 👇
+    </p>
+    {audioUrl ? <Audio src={audioUrl} /> : null}
+  </AbsoluteFill>
+);
+
+// ── Top-level composition: stitches hook → scenes (high rank to #1) → CTA ───
+export const RankingVideo: React.FC<RankingVideoProps> = ({ hook, hookAudioUrl, ctaAudioUrl, scenes }) => {
+  const hookDurationFrames = 60; // ~2s, trimmed to real audio length at render time in calculateMetadata
+  let cursor = hookDurationFrames;
+
+  const sceneSequences = scenes
+    .slice()
+    .sort((a, b) => b.rank - a.rank) // countdown: highest number first, #1 last
+    .map((scene) => {
+      const durationFrames = Math.max(60, Math.round(scene.audioDurationSec * FPS) + 15);
+      const from = cursor;
+      cursor += durationFrames;
+      return (
+        <Sequence key={scene.rank} from={from} durationInFrames={durationFrames}>
+          <RankScene scene={scene} />
+        </Sequence>
+      );
+    });
+
+  const ctaDurationFrames = 90;
+  const ctaFrom = cursor;
+
+  return (
+    <AbsoluteFill>
+      <Sequence from={0} durationInFrames={hookDurationFrames}>
+        <HookScene hook={hook} audioUrl={hookAudioUrl} />
+      </Sequence>
+      {sceneSequences}
+      <Sequence from={ctaFrom} durationInFrames={ctaDurationFrames}>
+        <CtaScene audioUrl={ctaAudioUrl} />
+      </Sequence>
+    </AbsoluteFill>
+  );
+};
+
+// Computes total duration from real scene audio lengths — called by
+// calculateMetadata in Root.tsx so the render isn't hardcoded to one length.
+export function computeDurationInFrames(scenes: Scene[]): number {
+  const hookFrames = 60;
+  const ctaFrames = 90;
+  const sceneFrames = scenes.reduce(
+    (sum, s) => sum + Math.max(60, Math.round(s.audioDurationSec * FPS) + 15),
+    0
+  );
+  return hookFrames + sceneFrames + ctaFrames;
+}
+
+export const VIDEO_FPS = FPS;
+export const VIDEO_WIDTH = 1080;
+export const VIDEO_HEIGHT = 1920;

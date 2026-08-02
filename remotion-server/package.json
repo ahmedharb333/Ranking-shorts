@@ -1,0 +1,21 @@
+{
+  "name": "ranking-shorts-remotion-server",
+  "version": "1.0.0",
+  "description": "Local Remotion render server for the RankingShorts pipeline. Run this on your machine, expose it via ngrok, and point REMOTION_SERVER_URL (Apps Script Script Property) at the ngrok URL.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "studio": "remotion studio src/Root.tsx"
+  },
+  "dependencies": {
+    "@remotion/bundler": "^4.0.0",
+    "@remotion/renderer": "^4.0.0",
+    "dotenv": "^17.4.2",
+    "express": "^4.19.2",
+    "googleapis": "^173.0.0",
+    "remotion": "^4.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}

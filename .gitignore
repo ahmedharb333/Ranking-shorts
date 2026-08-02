@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Secrets — never commit
+remotion-server/.env
+remotion-server/oauth-client.json
+remotion-server/drive-token.json
+.clasprc.json
+
+# Render output
+remotion-server/output/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS junk
+.DS_Store
+Thumbs.db
