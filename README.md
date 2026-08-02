@@ -77,7 +77,7 @@ npm start
 ```
 In a second terminal:
 ```bash
-ngrok http 3000
+ngrok http 3001
 ```
 Copy the `https://xxxx.ngrok-free.app` URL into the `REMOTION_SERVER_URL`
 Script Property. **This terminal + ngrok need to stay running** for renders
