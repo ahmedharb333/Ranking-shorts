@@ -4,7 +4,10 @@
    with headers. Then set Script Properties (File > Project properties >
    Script properties) for: ANTHROPIC_API_KEY, PEXELS_API_KEY, KLING_API_KEY,
    ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID, REMOTION_SERVER_URL,
-   YT_CLIENT_ID, YT_CLIENT_SECRET, YT_REFRESH_TOKEN, ALERT_EMAIL.
+   YT_CLIENT_ID, YT_CLIENT_SECRET, YT_REFRESH_TOKEN, ALERT_EMAIL, DRIVE_FOLDER_ID.
+   Optional: USDA_API_KEY (free api.data.gov key) enables USDA food-nutrition
+   grounding in the fact-verification stage; without it, food facts fall back to
+   web search. Countries grounding (World Bank) needs no key.
    Then run installAutomation() once. That's the entire manual setup.
    ============================================================================ */
 

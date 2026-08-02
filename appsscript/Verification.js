@@ -41,7 +41,15 @@ function stage1b_verifyFacts(scriptId) {
   const rankItems = JSON.parse(sh.getRange(rowIdx, COL_SCRIPT.RANK_ITEMS_JSON).getValue());
   const lean = rankItems.map(function (it) { return { rank: it.rank, name: it.name, fact: it.fact }; });
 
-  const head = "You are fact-checking a ranking video BEFORE publication. Items:\n" + JSON.stringify(lean) + "\n\n";
+  // Structured knowledge bank (World Bank / USDA) as authoritative grounding.
+  const niche = sh.getRange(rowIdx, COL_SCRIPT.NICHE).getValue();
+  let pack = "";
+  try { pack = fetchKnowledgePack_(niche, lean); } catch (e) { pack = ""; }
+  const grounding = pack
+    ? "AUTHORITATIVE DATA — prefer these figures and cite the given Source URL when you use one; only web-search for what they don't cover:\n" + pack + "\n\n"
+    : "";
+
+  const head = "You are fact-checking a ranking video BEFORE publication.\n\n" + grounding + "Items:\n" + JSON.stringify(lean) + "\n\n";
   const tail =
     "\nEach 'fact' <= 14 words, no filler, no [VERIFY] tags. 'on_screen_text' <= 6 words.\n" +
     "Respond with ONLY strict JSON as your final message (no prose, no code fences):\n" +
