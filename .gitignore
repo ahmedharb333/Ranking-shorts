@@ -7,8 +7,9 @@ remotion-server/oauth-client.json
 remotion-server/drive-token.json
 .clasprc.json
 
-# Render output
+# Render output + downloaded source clips
 remotion-server/output/
+remotion-server/clips/
 
 # Logs
 *.log

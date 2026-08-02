@@ -115,4 +115,40 @@ function isDriveConfigured() {
   catch { return false; }
 }
 
-module.exports = { uploadToDrive, isDriveConfigured };
+// True when we can *authenticate* to Drive (download doesn't need a
+// production folder, unlike uploads — hence a lighter check than isDriveConfigured).
+function isDriveAuthAvailable() {
+  if (!fs.existsSync(OAUTH_CLIENT_PATH) || !fs.existsSync(TOKEN_PATH)) return false;
+  try { require.resolve("googleapis"); return true; }
+  catch { return false; }
+}
+
+// Pull a Drive file ID out of the URL forms our pipeline produces:
+//   https://drive.google.com/uc?id=XXX  (Visuals.js saveUrlToDrive_)
+//   https://drive.google.com/file/d/XXX/view  (webViewLink)
+function extractDriveFileId(url) {
+  if (!url) return null;
+  const uc = String(url).match(/[?&]id=([^&]+)/);
+  if (uc) return uc[1];
+  const view = String(url).match(/\/d\/([^/]+)/);
+  if (view) return view[1];
+  return null;
+}
+
+// Download a Drive file to destPath using the authenticated client. Drive media
+// URLs can't be loaded directly by Remotion's headless Chrome (ORB/403), so the
+// render server fetches them itself and serves them over http://localhost.
+async function downloadFromDrive(fileId, destPath) {
+  const drive = getDriveClient();
+  const res = await drive.files.get(
+    { fileId, alt: "media", supportsAllDrives: true },
+    { responseType: "stream" }
+  );
+  await new Promise((resolve, reject) => {
+    const dest = fs.createWriteStream(destPath);
+    res.data.on("error", reject).pipe(dest).on("error", reject).on("finish", resolve);
+  });
+  return destPath;
+}
+
+module.exports = { uploadToDrive, isDriveConfigured, isDriveAuthAvailable, extractDriveFileId, downloadFromDrive };

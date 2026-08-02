@@ -131,7 +131,7 @@ const KLING_POLL_INTERVAL  = 15000;
 const KLING_MAX_POLLS      = 40;
 // Mix-mode rule: item ranks use Pexels; ONLY the #1 reveal scene uses Kling/Veo,
 // to control cost while still giving the "wow" hero shot AI video is good for.
-const AI_VIDEO_FOR_RANK_1_ONLY = true;
+const AI_VIDEO_FOR_RANK_1_ONLY = false;
 
 // ── YouTube Data API ──────────────────────────────────────────────────────────
 const YOUTUBE_UPLOAD_URL = "https://www.googleapis.com/upload/youtube/v3/videos";

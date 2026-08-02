@@ -33,6 +33,29 @@ app.use((req, res, next) => {
 const PORT = process.env.PORT || 3000;
 const OUTPUT_DIR = path.join(__dirname, "output");
 if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+const CLIPS_DIR = path.join(__dirname, "clips"); // Drive clips downloaded here, then served over localhost to the renderer
+if (!fs.existsSync(CLIPS_DIR)) fs.mkdirSync(CLIPS_DIR, { recursive: true });
+
+// Drive-hosted clip URLs (drive.google.com/uc?id=... from Visuals.js) can't be
+// loaded by Remotion's headless Chrome (ORB/403). Download them via the
+// authenticated Drive client and hand the renderer a localhost URL instead.
+// Non-Drive URLs (e.g. Pexels CDN) are returned unchanged — they load fine.
+async function resolveClipUrl(clipUrl) {
+  if (!clipUrl || !/drive\.google\.com/.test(clipUrl)) return clipUrl;
+  const fileId = driveUpload.extractDriveFileId(clipUrl);
+  if (!fileId) return clipUrl;
+  if (!driveUpload.isDriveAuthAvailable()) {
+    console.warn(`[clips] Drive clip ${clipUrl} needs auth to download but Drive is not authorized — leaving as-is (render will likely fail).`);
+    return clipUrl;
+  }
+  const localName = `${fileId}.mp4`;
+  const localPath = path.join(CLIPS_DIR, localName);
+  if (!fs.existsSync(localPath)) {
+    console.log(`[clips] downloading Drive clip ${fileId} -> clips/${localName}`);
+    await driveUpload.downloadFromDrive(fileId, localPath);
+  }
+  return `http://localhost:${PORT}/clips/${localName}`;
+}
 
 const jobs = new Map(); // jobId -> { status, startedAt, result, error }
 
@@ -66,10 +89,17 @@ app.post("/assemble/job", (req, res) => {
 
   (async () => {
     const serveUrl = await getBundleLocation();
+
+    // Resolve any Drive-hosted clip URLs to locally-served copies before render.
+    const rankScenes = scenes.filter((s) => s.type === "rank");
+    for (const s of rankScenes) {
+      s.clipUrl = await resolveClipUrl(s.clipUrl);
+    }
+
     const inputProps = { title: title || contentId, hook: scenes.find((s) => s.type === "hook")?.onScreenText || "",
       hookAudioUrl: scenes.find((s) => s.type === "hook")?.audioUrl || "",
       ctaAudioUrl: scenes.find((s) => s.type === "cta")?.audioUrl || "",
-      scenes: scenes.filter((s) => s.type === "rank") };
+      scenes: rankScenes };
 
     const composition = await selectComposition({ serveUrl, id: "RankingVideo", inputProps });
     const filename = `${contentId}.mp4`;
@@ -113,6 +143,7 @@ app.get("/assemble/job/:id", (req, res) => {
 });
 
 app.use("/output", express.static(OUTPUT_DIR));
+app.use("/clips", express.static(CLIPS_DIR));
 
 app.listen(PORT, () => {
   console.log(`RankingShorts render server listening on :${PORT}`);
