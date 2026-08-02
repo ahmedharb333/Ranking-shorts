@@ -17,7 +17,10 @@
 function fetchKnowledgePack_(niche, items) {
   try {
     const n = String(niche || "").toLowerCase();
-    if (n === "countries") return worldBankPack_(items);
+    if (n === "countries") {
+      return [worldBankPack_(items), whereNextCountryPack_(items)]
+        .filter(function (x) { return x; }).join("\n\n");
+    }
     if (n === "food") return usdaPack_(items);
     return ""; // places & anything else -> web_search fallback
   } catch (e) {
@@ -34,27 +37,24 @@ function worldBankPack_(items) {
       .filter(function (x) { return x.iso; });
     if (!wanted.length) return "";
 
-    const codes = wanted.map(function (x) { return x.iso; }).join(";");
     const indicators = [
       { code: "NY.GDP.PCAP.CD", label: "GDP per capita (US$)" },
       { code: "FP.CPI.TOTL.ZG", label: "inflation %" },
-      { code: "SP.DYN.LE00.IN", label: "life expectancy (yrs)" },
-      { code: "SP.POP.TOTL",    label: "population" }
+      { code: "SP.DYN.LE00.IN", label: "life expectancy (yrs)" }
     ];
 
+    // Per-country calls (World Bank rejects multi-country ';' with mrnev) with a
+    // retry + light spacing — the API rate-limits rapid bursts with XML errors.
     const byIso = {};
-    wanted.forEach(function (x) { byIso[x.iso] = { name: x.name, vals: {} }; });
-
-    indicators.forEach(function (ind) {
-      const url = "https://api.worldbank.org/v2/country/" + codes + "/indicator/" +
-        ind.code + "?format=json&mrnev=1&per_page=1000";
-      const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-      const json = JSON.parse(res.getContentText());
-      const rows = (json && json[1]) || [];
-      rows.forEach(function (r) {
-        if (r && r.countryiso3code && r.value != null && byIso[r.countryiso3code]) {
-          byIso[r.countryiso3code].vals[ind.label] = { value: r.value, year: r.date };
-        }
+    wanted.forEach(function (x) {
+      byIso[x.iso] = { name: x.name, vals: {} };
+      indicators.forEach(function (ind) {
+        const url = "https://api.worldbank.org/v2/country/" + x.iso + "/indicator/" +
+          ind.code + "?format=json&mrnev=1";
+        const json = wbFetchJson_(url);
+        const row = json && json[1] && json[1][0];
+        if (row && row.value != null) byIso[x.iso].vals[ind.label] = { value: row.value, year: row.date };
+        Utilities.sleep(150);
       });
     });
 
@@ -72,6 +72,20 @@ function worldBankPack_(items) {
   } catch (e) {
     return "";
   }
+}
+
+// World Bank fetch with one retry — the API returns XML error pages under rapid
+// bursts. WB JSON responses always start with '[' (metadata array).
+function wbFetchJson_(url) {
+  for (var attempt = 0; attempt < 3; attempt++) {
+    try {
+      var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+      var txt = res.getContentText();
+      if (txt && txt.charAt(0) === "[") return JSON.parse(txt);
+    } catch (e) { /* fall through to retry */ }
+    Utilities.sleep(700 * (attempt + 1)); // 700ms, 1400ms backoff
+  }
+  return null;
 }
 
 // name(lowercased) -> ISO3, cached 6h. Skips aggregates (regions, income groups).
@@ -103,6 +117,49 @@ function wbMatchIso_(map, name) {
   let hit = keys.find(function (k) { return k.indexOf(n) === 0 || n.indexOf(k) === 0; });
   if (!hit) hit = keys.find(function (k) { return k.indexOf(n) !== -1 || n.indexOf(k) !== -1; });
   return hit ? map[hit] : "";
+}
+
+// ── WhereNext (Countries cost of living) — free live JSON API ────────────────
+function whereNextCountryPack_(items) {
+  try {
+    const map = whereNextCountryMap_();
+    const lines = items.map(function (it) {
+      const r = wnMatch_(map, it.name);
+      if (!r) return null;
+      return "- " + r.country + " [WhereNext cost of living, 2026]: cost index " + r.cost_index +
+        "/100, ~$" + r.monthly_estimate_usd + "/month, rent index " + r.rent_index +
+        ", grocery index " + r.grocery_index +
+        ". Source: https://getwherenext.com/data/cost-of-living-2026";
+    }).filter(function (x) { return x; });
+    return lines.length ? ("WhereNext cost-of-living:\n" + lines.join("\n")) : "";
+  } catch (e) {
+    return "";
+  }
+}
+
+// country name(lowercased) -> record, cached 6h.
+function whereNextCountryMap_() {
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get("wn_col_map");
+  if (cached) return JSON.parse(cached);
+
+  const res = UrlFetchApp.fetch("https://getwherenext.com/api/data/cost-of-living", { muteHttpExceptions: true });
+  const json = JSON.parse(res.getContentText());
+  const rows = (json && json.data) || [];
+  const map = {};
+  rows.forEach(function (r) { if (r && r.country) map[r.country.toLowerCase()] = r; });
+  try { cache.put("wn_col_map", JSON.stringify(map), 21600); } catch (e) {}
+  return map;
+}
+
+function wnMatch_(map, name) {
+  const n = String(name || "").toLowerCase().trim();
+  if (!n) return null;
+  if (map[n]) return map[n];
+  const keys = Object.keys(map);
+  let hit = keys.find(function (k) { return k.indexOf(n) === 0 || n.indexOf(k) === 0; });
+  if (!hit) hit = keys.find(function (k) { return k.indexOf(n) !== -1 || n.indexOf(k) !== -1; });
+  return hit ? map[hit] : null;
 }
 
 // ── USDA FoodData Central (Food) ─────────────────────────────────────────────
