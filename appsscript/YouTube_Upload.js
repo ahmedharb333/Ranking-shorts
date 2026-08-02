@@ -17,14 +17,28 @@ function stage4_5_generateYoutubeMetadata(scriptId) {
   try {
     const raw = callClaude(prompt, "stage4_metadata");
     const parsed = parseClaudeJson(raw);
+    const description = parsed.description + buildSourcesBlock_(scriptRow);
     const sh = SpreadsheetApp.getActive().getSheetByName(SHEET.YOUTUBE);
-    sh.appendRow([scriptId, parsed.title_a, parsed.title_b, parsed.description,
+    sh.appendRow([scriptId, parsed.title_a, parsed.title_b, description,
       parsed.tags, parsed.hashtags, parsed.first_comment, parsed.thumbnail_brief, "Ready"]);
     return true;
   } catch (err) {
     logError("Stage 4.5 — YouTube Metadata", scriptId, "API Error", err.message);
     return false;
   }
+}
+
+// Builds a "Sources" section from the verified rank items (each carries a
+// source URL from Stage 1.5). Returns "" if no sources are present.
+function buildSourcesBlock_(scriptRow) {
+  let items;
+  try { items = JSON.parse(scriptRow[COL_SCRIPT.RANK_ITEMS_JSON - 1]); }
+  catch (e) { return ""; }
+  const lines = (items || [])
+    .filter(function (it) { return it && it.source; })
+    .map(function (it) { return "#" + it.rank + " " + it.name + ": " + it.source; });
+  if (!lines.length) return "";
+  return "\n\nSources:\n" + lines.join("\n");
 }
 
 // ── STAGE 5 — Upload ──────────────────────────────────────────────────────────

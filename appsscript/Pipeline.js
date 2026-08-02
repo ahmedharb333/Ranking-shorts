@@ -134,6 +134,9 @@ function updateIdeaStatus_(row, status, pipelineTag) {
 function stage2_buildVisualPlan(scriptId) {
   const scriptRow = findRowById_(SHEET.SCRIPT, scriptId, COL_SCRIPT.ID);
   if (!scriptRow) return false;
+  // Only proceed once facts are verified (Stage 1.5). Unverified/failed scripts
+  // wait here and are retried next tick — nothing gets made from unchecked facts.
+  if (scriptRow[COL_SCRIPT.STATUS - 1] !== "Verified") return false;
 
   const rankItems = JSON.parse(scriptRow[COL_VISUAL_ITEMS_JSON_INDEX(scriptRow)]);
   const visualSh = SpreadsheetApp.getActive().getSheetByName(SHEET.VISUAL);

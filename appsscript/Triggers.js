@@ -33,6 +33,10 @@ function runPipelineTick() {
   // 1. Advance any script that hasn't been through Stage 1 yet.
   if (timeLeft() > 20000) stage1_generateScript();
 
+  // 1.5 Fact-check the next unverified script (web_search) before anything is
+  //     built from it. Needs headroom — web_search calls are slow.
+  if (timeLeft() > 60000) stage1b_verifyReadyScripts();
+
   // 2. Build visual plans for scripts that have one but no visuals yet.
   forEachReadyScript_(SHEET.VISUAL, function (id) {
     if (timeLeft() > 15000) stage2_buildVisualPlan(id);
