@@ -43,11 +43,13 @@ function getDriveClient() {
 
 async function uploadToDrive(localFilePath, filename, contentId) {
   const drive = getDriveClient();
-  const folderId = await getOrCreateContentFolder(drive, contentId);
-  await deleteExistingFile(drive, filename, folderId);
+  const contentFolderId = await getOrCreateContentFolder(drive, contentId);
+  // Final render goes in a "final video" subfolder alongside the source assets.
+  const finalFolderId = await getOrCreateChildFolder(drive, contentFolderId, "final video");
+  await deleteExistingFile(drive, filename, finalFolderId);
 
   const response = await drive.files.create({
-    requestBody: { name: filename, parents: [folderId], mimeType: "video/mp4" },
+    requestBody: { name: filename, parents: [finalFolderId], mimeType: "video/mp4" },
     media: { mimeType: "video/mp4", body: fs.createReadStream(localFilePath) },
     fields: "id,name,webViewLink,webContentLink",
     supportsAllDrives: true
@@ -73,20 +75,27 @@ async function getOrCreateContentFolder(drive, contentId) {
     throw new Error("DRIVE_FOLDER_ID not set. Set it in .env: DRIVE_FOLDER_ID=your_folder_id");
   }
   const id = String(contentId || "").trim();
+  // Same per-video folder Apps Script creates for the source assets, so both
+  // sides converge on one folder per video.
+  return getOrCreateChildFolder(drive, PRODUCTION_FOLDER_ID, id);
+}
+
+// Find-or-create a folder named `name` directly under `parentId`.
+async function getOrCreateChildFolder(drive, parentId, name) {
+  const safe = String(name).replace(/'/g, "\\'");
   const search = await drive.files.list({
-    q: `mimeType='application/vnd.google-apps.folder' and '${PRODUCTION_FOLDER_ID}' in parents and trashed=false and name contains '${id}'`,
+    q: `mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false and name='${safe}'`,
     fields: "files(id,name)",
     spaces: "drive",
     supportsAllDrives: true,
     includeItemsFromAllDrives: true,
-    pageSize: 100
+    pageSize: 10
   });
-  const files = search.data.files || [];
-  const match = files.find((f) => f.name === id);
+  const match = (search.data.files || []).find((f) => f.name === name);
   if (match) return match.id;
 
   const folder = await drive.files.create({
-    requestBody: { name: id, mimeType: "application/vnd.google-apps.folder", parents: [PRODUCTION_FOLDER_ID] },
+    requestBody: { name: name, mimeType: "application/vnd.google-apps.folder", parents: [parentId] },
     fields: "id",
     supportsAllDrives: true
   });

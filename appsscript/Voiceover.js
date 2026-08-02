@@ -19,7 +19,7 @@ function stage3_generateVoiceover(scriptId) {
 
   lines.forEach(function (line) {
     try {
-      const audioUrl = synthesizeVoice_(line.text);
+      const audioUrl = synthesizeVoice_(line.text, scriptId);
       const durationSec = estimateDurationSec_(line.text);
       audioSh.appendRow([scriptId, line.idx, audioUrl, durationSec, "Ready"]);
     } catch (err) {
@@ -30,7 +30,7 @@ function stage3_generateVoiceover(scriptId) {
   return true;
 }
 
-function synthesizeVoice_(text) {
+function synthesizeVoice_(text, contentId) {
   const apiKey = PropertiesService.getScriptProperties().getProperty("ELEVENLABS_API_KEY");
   const voiceId = PropertiesService.getScriptProperties().getProperty("ELEVENLABS_VOICE_ID");
 
@@ -46,7 +46,7 @@ function synthesizeVoice_(text) {
     throw new Error("ElevenLabs error: " + res.getContentText().slice(0, 300));
   }
 
-  const folder = getOrCreateFolder_(DRIVE_FOLDER_NAME);
+  const folder = getContentFolder_(contentId);
   const blob = res.getBlob().setName("vo_" + Utilities.getUuid().slice(0, 8) + ".mp3");
   const file = folder.createFile(blob);
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);

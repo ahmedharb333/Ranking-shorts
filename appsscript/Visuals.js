@@ -18,7 +18,7 @@ function stage2b_resolveVisuals() {
 
     try {
       if (source === "pexels") {
-        const url = fetchPexelsClip_(query);
+        const url = fetchPexelsClip_(query, id);
         sh.getRange(i + 1, COL_VISUAL.CLIP_URL).setValue(url);
         sh.getRange(i + 1, COL_VISUAL.STATUS).setValue("Ready");
       } else if (source === "kling") {
@@ -34,7 +34,7 @@ function stage2b_resolveVisuals() {
   pollPendingKlingJobs_();
 }
 
-function fetchPexelsClip_(query) {
+function fetchPexelsClip_(query, contentId) {
   const apiKey = PropertiesService.getScriptProperties().getProperty("PEXELS_API_KEY");
   const res = UrlFetchApp.fetch(
     PEXELS_API_URL + "?query=" + encodeURIComponent(query) + "&orientation=portrait&per_page=1",
@@ -46,7 +46,7 @@ function fetchPexelsClip_(query) {
   // Prefer HD portrait file
   const file = video.video_files.find(function (f) { return f.quality === "hd" && f.width < f.height; })
     || video.video_files[0];
-  return saveUrlToDrive_(file.link, "pexels_" + video.id + ".mp4");
+  return saveUrlToDrive_(file.link, "pexels_" + video.id + ".mp4", contentId);
 }
 
 // ── Kling auth ─────────────────────────────────────────────────────────────
@@ -105,7 +105,7 @@ function pollPendingKlingJobs_() {
       });
       const data2 = JSON.parse(res.getContentText());
       if (data2.status === "succeed" && data2.video_url) {
-        const driveUrl = saveUrlToDrive_(data2.video_url, "kling_" + taskId + ".mp4");
+        const driveUrl = saveUrlToDrive_(data2.video_url, "kling_" + taskId + ".mp4", data[i][COL_VISUAL.ID - 1]);
         sh.getRange(i + 1, COL_VISUAL.CLIP_URL).setValue(driveUrl);
         sh.getRange(i + 1, COL_VISUAL.STATUS).setValue("Ready");
       }
@@ -116,13 +116,32 @@ function pollPendingKlingJobs_() {
   }
 }
 
-function saveUrlToDrive_(url, filename) {
-  const folder = getOrCreateFolder_(DRIVE_FOLDER_NAME);
+// Saves a remote file into the per-video content folder:
+//   <production folder (DRIVE_FOLDER_ID)>/<contentId>/<filename>
+function saveUrlToDrive_(url, filename, contentId) {
+  const folder = getContentFolder_(contentId);
   const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
   const blob = res.getBlob().setName(filename);
   const file = folder.createFile(blob);
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   return "https://drive.google.com/uc?id=" + file.getId();
+}
+
+// The production root folder, by ID (same folder the render server uploads to,
+// set as Script Property DRIVE_FOLDER_ID). Both sides must agree so all of a
+// video's assets and its final render live under one per-video folder.
+function getProductionFolder_() {
+  const id = PropertiesService.getScriptProperties().getProperty("DRIVE_FOLDER_ID");
+  if (!id) throw new Error("DRIVE_FOLDER_ID not set in Script Properties — set it to your production folder's ID (same value as the render server's .env).");
+  return DriveApp.getFolderById(id);
+}
+
+// The per-video folder, named by contentId, created under the production folder.
+function getContentFolder_(contentId) {
+  if (!contentId) throw new Error("getContentFolder_ requires a contentId");
+  const parent = getProductionFolder_();
+  const it = parent.getFoldersByName(String(contentId));
+  return it.hasNext() ? it.next() : parent.createFolder(String(contentId));
 }
 
 // Handles both "https://drive.google.com/uc?id=XXX" (our own saveUrlToDrive_)
@@ -134,9 +153,4 @@ function extractDriveFileId_(url) {
   const viewMatch = url.match(/\/d\/([^/]+)/);
   if (viewMatch) return viewMatch[1];
   throw new Error("Could not extract Drive file ID from: " + url);
-}
-
-function getOrCreateFolder_(name) {
-  const it = DriveApp.getFoldersByName(name);
-  return it.hasNext() ? it.next() : DriveApp.createFolder(name);
 }

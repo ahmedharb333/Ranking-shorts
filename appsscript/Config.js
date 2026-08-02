@@ -115,7 +115,11 @@ const VIDEOS_PER_DAY = 4;              // mid-point of your 3-5/day target
 const MAX_PIPELINE_RUNTIME_PER_TICK_MS = 5 * 60 * 1000; // stay under 6-min Apps Script cap
 
 // ── Google Drive folder structure ─────────────────────────────────────────────
-const DRIVE_FOLDER_NAME = "RankingShorts Production";
+// All of a video's files live under one per-video folder named by its ID:
+//   <DRIVE_FOLDER_ID>/<contentId>/            clips + audio  (Apps Script)
+//   <DRIVE_FOLDER_ID>/<contentId>/final video/<contentId>.mp4  (render server)
+// DRIVE_FOLDER_ID is a Script Property (same value as the render server's .env),
+// read via getProductionFolder_() in Visuals.js.
 
 // ── ElevenLabs API ────────────────────────────────────────────────────────────
 const ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/text-to-speech";

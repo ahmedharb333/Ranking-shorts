@@ -52,14 +52,38 @@ function stage0_refillTopicQueue() {
     try {
       const raw = callClaude(prompt, "stage0_topic_pick");
       const parsed = parseClaudeJson(raw);
+      const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd");
+      let seq = nextSeqForNicheDate_(sh, niche, today);
       parsed.topics.forEach(function (t) {
-        const id = "RS-" + Utilities.getUuid().slice(0, 8);
+        // Human-readable ID: niche-YYYYMMDD-NNN, counted per niche per day.
+        const id = niche.toLowerCase() + "-" + today + "-" + pad3_(seq);
+        seq++;
         sh.appendRow([id, niche, t.title, t.angle, "Normal", "Queued", "", ""]);
       });
     } catch (err) {
       logError("Stage 0 — Topic Pick", niche, "API Error", err.message);
     }
   });
+}
+
+// Next sequence number for a niche on a given day (scans existing IDs).
+function nextSeqForNicheDate_(sh, niche, yyyymmdd) {
+  const prefix = niche.toLowerCase() + "-" + yyyymmdd + "-";
+  const ids = sh.getDataRange().getValues().slice(1)
+    .map(function (r) { return String(r[COL_IDEA.ID - 1] || ""); });
+  let max = 0;
+  ids.forEach(function (id) {
+    if (id.indexOf(prefix) === 0) {
+      const n = parseInt(id.slice(prefix.length), 10);
+      if (!isNaN(n) && n > max) max = n;
+    }
+  });
+  return max + 1;
+}
+
+function pad3_(n) {
+  n = String(n);
+  return n.length >= 3 ? n : ("000" + n).slice(-3);
 }
 
 function getKilledTopics_() {

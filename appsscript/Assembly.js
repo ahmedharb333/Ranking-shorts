@@ -90,7 +90,7 @@ function stage4b_pollAssemblyJobs() {
         // Preferred path: server already uploaded straight to Drive.
         const driveUrl = job.drive && job.drive.driveUrl
           ? job.drive.driveUrl
-          : saveUrlToDrive_(job.url, data[i][COL_ASSEMBLY.ID - 1] + ".mp4"); // fallback if Drive wasn't configured on the server
+          : saveUrlToDrive_(job.url, data[i][COL_ASSEMBLY.ID - 1] + ".mp4", data[i][COL_ASSEMBLY.ID - 1]); // fallback if Drive wasn't configured on the server
         sh.getRange(i + 1, COL_ASSEMBLY.STATUS).setValue("done");
         sh.getRange(i + 1, COL_ASSEMBLY.MP4_URL).setValue(driveUrl);
         if (job.driveError) sh.getRange(i + 1, COL_ASSEMBLY.NOTE).setValue("Drive upload issue: " + job.driveError);
