@@ -124,6 +124,15 @@ const MAX_PIPELINE_RUNTIME_PER_TICK_MS = 5 * 60 * 1000; // stay under 6-min Apps
 // ── ElevenLabs API ────────────────────────────────────────────────────────────
 const ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/text-to-speech";
 const ELEVENLABS_MODEL   = "eleven_multilingual_v2";
+// Punchy, energetic delivery for fast ranking Shorts: lower stability = more
+// dynamic/expressive; style adds emphasis; speaker_boost sharpens presence.
+// Tune these to taste — they're passed on every TTS call.
+const ELEVENLABS_VOICE_SETTINGS = {
+  stability: 0.35,
+  similarity_boost: 0.8,
+  style: 0.45,
+  use_speaker_boost: true
+};
 
 // ── Pexels API ────────────────────────────────────────────────────────────────
 const PEXELS_API_URL = "https://api.pexels.com/videos/search";

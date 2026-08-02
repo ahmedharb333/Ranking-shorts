@@ -19,8 +19,10 @@ function stage3_generateVoiceover(scriptId) {
 
   lines.forEach(function (line) {
     try {
-      const audioUrl = synthesizeVoice_(line.text, scriptId);
-      const durationSec = estimateDurationSec_(line.text);
+      const clean = cleanTtsText_(line.text);
+      if (!clean) return; // nothing left to speak
+      const audioUrl = synthesizeVoice_(clean, scriptId);
+      const durationSec = estimateDurationSec_(clean);
       audioSh.appendRow([scriptId, line.idx, audioUrl, durationSec, "Ready"]);
     } catch (err) {
       logError("Stage 3 — Voiceover", scriptId, "TTS Error", err.message);
@@ -28,6 +30,18 @@ function stage3_generateVoiceover(scriptId) {
   });
 
   return true;
+}
+
+// Removes internal review markers so they're never spoken aloud. Claude flags
+// low-confidence claims with [VERIFY] (see SYSTEM_CONTEXT); without this the
+// narrator literally reads "verify" after those facts. Strips bracketed/parens
+// verify/verified/unverified tags and tidies spacing.
+function cleanTtsText_(text) {
+  return String(text || "")
+    .replace(/[\[\(]\s*(?:un)?verif(?:y|ied)?\s*[\]\)]/gi, " ")
+    .replace(/\s+([.,!?;:])/g, "$1")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 function synthesizeVoice_(text, contentId) {
@@ -38,7 +52,7 @@ function synthesizeVoice_(text, contentId) {
     method: "post",
     contentType: "application/json",
     headers: { "xi-api-key": apiKey },
-    payload: JSON.stringify({ text: text, model_id: ELEVENLABS_MODEL }),
+    payload: JSON.stringify({ text: text, model_id: ELEVENLABS_MODEL, voice_settings: ELEVENLABS_VOICE_SETTINGS }),
     muteHttpExceptions: true
   });
 
