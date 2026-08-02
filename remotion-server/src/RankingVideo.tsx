@@ -58,6 +58,45 @@ const RankBadge: React.FC<{ rank: number }> = ({ rank }) => {
   );
 };
 
+// ── Item name — the WHAT of the ranking. Sits under the rank badge and stays
+//    on screen the whole scene so viewers always see what's ranked. ───────────
+const NameTitle: React.FC<{ name: string }> = ({ name }) => {
+  const frame = useCurrentFrame();
+  const opacity = interpolate(frame, [2, 14], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const translateX = interpolate(frame, [2, 14], [-40, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 235,
+        left: 40,
+        right: 40,
+        opacity,
+        transform: `translateX(${translateX}px)`,
+      }}
+    >
+      <span
+        style={{
+          display: "inline-block",
+          background: "rgba(0,0,0,0.7)",
+          color: "white",
+          fontSize: 66,
+          fontWeight: 900,
+          fontFamily: "Arial Black, sans-serif",
+          lineHeight: 1.1,
+          padding: "14px 26px",
+          borderRadius: 18,
+          WebkitBoxDecorationBreak: "clone",
+          boxDecorationBreak: "clone",
+        }}
+      >
+        {name}
+      </span>
+    </div>
+  );
+};
+
 // ── Bottom-third animated caption (the on-screen text / fact) ────────────────
 const Caption: React.FC<{ text: string }> = ({ text }) => {
   const frame = useCurrentFrame();
@@ -88,8 +127,11 @@ const Caption: React.FC<{ text: string }> = ({ text }) => {
 // ── One ranked item: background clip + rank badge + caption + synced audio ──
 const RankScene: React.FC<{ scene: Scene }> = ({ scene }) => (
   <AbsoluteFill style={{ backgroundColor: "black" }}>
-    <Video src={scene.clipUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} muted />
+    {scene.clipUrl ? (
+      <Video src={scene.clipUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} muted />
+    ) : null}
     <RankBadge rank={scene.rank} />
+    {scene.name ? <NameTitle name={scene.name} /> : null}
     <Caption text={scene.onScreenText} />
     {scene.audioUrl ? <Audio src={scene.audioUrl} /> : null}
   </AbsoluteFill>
