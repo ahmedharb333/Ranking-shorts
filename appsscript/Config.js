@@ -152,7 +152,9 @@ const KLING_MAX_POLLS      = 40;
 //   "all"  — Kling AI video for EVERY item (most unique look + best match for
 //            hard-to-stock topics; highest cost + slowest, all clips are async)
 // Fallback default; override live via menu (Script Property VIDEO_MODE).
-const VIDEO_MODE_DEFAULT = "hero";
+// "ai-image-all": every item gets a free Pollinations image of the ACTUAL
+// subject — reliable relevance for food/niche topics stock libraries can't cover.
+const VIDEO_MODE_DEFAULT = "ai-image-all";
 // Modes: "none" (all Pexels) | "hero"/"all" (Kling AI video for #1 / every item)
 //        | "ai-image"/"ai-image-all" (FREE Pollinations AI image + Ken Burns
 //        zoom for #1 / every item — no key, no cost, good for hard-to-stock subjects)
@@ -224,6 +226,13 @@ FORMAT RULES (mandatory):
 - Structure: Hook → ranked items (5, countdown #5→#1) → each item gets ONE punchy
   fact = its metric value, never generic description → closing line that teases a
   follow-up or asks a direct question for comments
+- VISUAL QUERY: every ranked item needs a "search_query" — a clean 3-6 word
+  description of the ACTUAL thing to show on screen, for stock footage / AI image
+  generation. Use the plain food/place/object, NO numbers, NO units, NO obscure
+  brand or product names (stock has no footage of them, and numbers mislead the
+  search — "peak" once returned a mountain). E.g. "close-up spicy fried chicken
+  wings", "bowl of tonkotsu ramen", "old town street in Lisbon", "gold-wrapped
+  cheeseburger".
 - No filler phrases ("it's worth noting", "as we can see", "interestingly")
 - Every factual claim must be plausible and specific (real cities/countries/dishes,
   real approximate costs or stats) — flag anything you are not confident about
@@ -233,7 +242,7 @@ OUTPUT FORMAT: respond with strict JSON only, matching this shape:
 {
   "title": "...",
   "hook": "...",
-  "rank_items": [{"rank": 5, "name": "...", "fact": "...", "on_screen_text": "..."}],
+  "rank_items": [{"rank": 5, "name": "...", "fact": "...", "on_screen_text": "...", "search_query": "..."}],
   "voiceover_script": "...",
   "cta": "...",
   "duration_target_sec": 38,

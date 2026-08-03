@@ -56,9 +56,10 @@ function stage1b_verifyFacts(scriptId) {
   const head = "You are fact-checking a ranking video BEFORE publication.\n\n" + grounding + "Items:\n" + JSON.stringify(lean) + "\n\n";
   const tail =
     "\nEach 'fact' <= 14 words, no filler, no [VERIFY] tags. 'on_screen_text' <= 6 words.\n" +
+    "Each item also needs a clean 'search_query' (3-6 words) — the ACTUAL food/place/object to show on screen for stock/AI visuals, NO numbers, NO units, NO obscure brand names (e.g. 'close-up spicy chicken wings'). Rewrite it for any item you replace.\n" +
     "ALSO return an updated 'hook' — one punchy line that works muted, ABOUT the FINAL #1 item, using ITS verified number, so the hook can never contradict the ranking.\n" +
     "Respond with ONLY strict JSON as your final message (no prose, no code fences):\n" +
-    '{"hook":"...","items":[{"rank":N,"name":"...","fact":"...","on_screen_text":"...","source":"https://..."}]}';
+    '{"hook":"...","items":[{"rank":N,"name":"...","fact":"...","on_screen_text":"...","search_query":"...","source":"https://..."}]}';
 
   const prompt = isPerspective
     ? head +
@@ -92,6 +93,7 @@ function stage1b_verifyFacts(scriptId) {
           name: v.name,
           fact: v.fact,
           on_screen_text: v.on_screen_text || "",
+          search_query: v.search_query || v.name,
           source: hasSource ? v.source : ""
         };
       })

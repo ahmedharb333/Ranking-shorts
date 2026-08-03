@@ -160,6 +160,17 @@ function getPublishedTitles_() {
   return ids.map(function (id) { return titleById[id]; }).filter(function (x) { return x; });
 }
 
+// Safety net: strip numbers/units/symbols from a visual query so stock/AI
+// search never keys off a stray "2,200,000 SHU" or "$63" (which mislead it).
+function cleanVisualQuery_(q) {
+  const cleaned = String(q || "")
+    .replace(/\$?\d[\d,\.]*\s*(shu|cal|kcal|usd|dollars?|units?)?/gi, " ")
+    .replace(/[#\/|]+/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return cleaned || String(q || "").trim();
+}
+
 // Next sequence number for a niche on a given day (scans existing IDs).
 function nextSeqForNicheDate_(sh, niche, yyyymmdd) {
   const prefix = niche.toLowerCase() + "-" + yyyymmdd + "-";
@@ -251,10 +262,10 @@ function stage2_buildVisualPlan(scriptId) {
     let source = "pexels";
     if (videoMode === "all" || (videoMode === "hero" && isTop)) source = "kling";
     else if (videoMode === "ai-image-all" || (videoMode === "ai-image" && isTop)) source = "aiimage";
-    visualSh.appendRow([
-      scriptId, idx, item.name + " " + (item.on_screen_text || ""),
-      source, "", "", "Queued", ""
-    ]);
+    // Clean, stock/AI-friendly visual query (never numbers/captions, which
+    // returned mountains for "Carolina Reaper Wings 2.2M SHU peak").
+    const query = cleanVisualQuery_(item.search_query || item.name);
+    visualSh.appendRow([scriptId, idx, query, source, "", "", "Queued", ""]);
   });
   return true;
 }
