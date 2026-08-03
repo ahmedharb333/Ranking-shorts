@@ -12,13 +12,70 @@
    ============================================================================ */
 
 function onOpen() {
-  SpreadsheetApp.getUi().createMenu("RankingShorts")
-    .addItem("1. Setup sheets", "setupSheets")
-    .addItem("2. Install automation (run once)", "installAutomation")
+  const ui = SpreadsheetApp.getUi();
+  ui.createMenu("RankingShorts")
+    .addSubMenu(ui.createMenu("Setup & automation")
+      .addItem("1. Setup sheets", "setupSheets")
+      .addItem("2. Install automation (run once)", "installAutomation")
+      .addSeparator()
+      .addItem("⏸ Pause automation", "pauseAutomation")
+      .addItem("▶ Resume automation", "installAutomation"))
     .addSeparator()
-    .addItem("Run one tick now (manual test)", "runPipelineTick")
-    .addItem("Refill topic queue now", "stage0_refillTopicQueue")
+    .addItem("▶ Run full tick now", "runPipelineTick")
+    .addSubMenu(ui.createMenu("Run one stage")
+      .addItem("0 · Refill topic queue", "stage0_refillTopicQueue")
+      .addItem("1 · Generate next script", "menu_stage1_")
+      .addItem("1.5 · Verify next script (web search)", "stage1b_verifyReadyScripts")
+      .addItem("2 · Build visual plans", "menu_stage2Plans_")
+      .addItem("2B · Resolve visuals (Pexels/Kling)", "stage2b_resolveVisuals")
+      .addItem("3 · Generate voiceover", "menu_stage3_")
+      .addItem("4 · Submit assembly", "menu_stage4Submit_")
+      .addItem("4B · Poll renders", "stage4b_pollAssemblyJobs")
+      .addItem("4.5 · YouTube metadata", "menu_stage45_")
+      .addItem("5 · Upload ready videos", "stage5_uploadReadyVideos"))
+    .addSeparator()
+    .addItem("📊 Show pipeline status", "showPipelineStatus")
     .addToUi();
+}
+
+// ── Manual controls ──────────────────────────────────────────────────────────
+// No-arg wrappers so single stages can be run from the menu. The per-id stages
+// reuse the same "find what's ready" helpers the automatic tick uses.
+function menu_stage1_()      { stage1_generateScript(); }
+function menu_stage2Plans_() { forEachReadyScript_(SHEET.VISUAL, stage2_buildVisualPlan); }
+function menu_stage3_()      { forEachVisualsReadyScript_(stage3_generateVoiceover); }
+function menu_stage45_()     { forEachReadyScript_(SHEET.YOUTUBE, stage4_5_generateYoutubeMetadata); }
+function menu_stage4Submit_() {
+  forEachAudioReadyScript_(function (id) {
+    try { stage4_submitAssembly(id); } catch (err) { logError("Stage 4 — Submit", id, "Submit Error", err.message); }
+  });
+}
+
+function pauseAutomation() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { ScriptApp.deleteTrigger(t); });
+  SpreadsheetApp.getUi().alert("Automation paused — all triggers removed. Use 'Resume automation' to restart.");
+}
+
+function showPipelineStatus() {
+  const ss = SpreadsheetApp.getActive();
+  function count(name) { const sh = ss.getSheetByName(name); return sh ? Math.max(0, sh.getLastRow() - 1) : 0; }
+  const errSh = ss.getSheetByName(SHEET.ERROR_LOG);
+  const unresolved = errSh
+    ? errSh.getDataRange().getValues().slice(1).filter(function (r) { return r[COL_ERROR.RESOLVED - 1] !== "YES"; }).length
+    : 0;
+  const triggers = ScriptApp.getProjectTriggers().length;
+
+  const msg =
+    "Automation: " + (triggers ? triggers + " trigger(s) — RUNNING" : "PAUSED") + "\n\n" +
+    "Idea queue:   " + count(SHEET.IDEA) + "\n" +
+    "Scripts:      " + count(SHEET.SCRIPT) + "\n" +
+    "Visuals:      " + count(SHEET.VISUAL) + "\n" +
+    "Audio:        " + count(SHEET.AUDIO) + "\n" +
+    "Assemblies:   " + count(SHEET.ASSEMBLY) + "\n" +
+    "Metadata:     " + count(SHEET.YOUTUBE) + "\n" +
+    "Published:    " + count(SHEET.PUBLISHING) + "\n\n" +
+    "Unresolved errors: " + unresolved;
+  SpreadsheetApp.getUi().alert("RankingShorts — pipeline status", msg, SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
 function setupSheets() {
