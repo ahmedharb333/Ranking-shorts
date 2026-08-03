@@ -68,17 +68,28 @@ async function resolveClipUrl(clipUrl, mediaType) {
     }
     return `http://localhost:${PORT}/clips/${localName}`;
   } catch (e) {
-    console.warn(`[clips] localize failed (${e.message}) — using remote URL as-is`);
-    return clipUrl;
+    // For images, degrade gracefully: an empty clipUrl renders a black scene
+    // (rank/name/caption still show) so ONE bad AI image can't fail the video.
+    console.warn(`[clips] localize failed (${e.message}) — ${isImage ? "rendering black for this scene" : "using remote URL"}`);
+    return isImage ? "" : clipUrl;
   }
 }
 
-// Plain HTTP download (for non-Drive images). No render-time timeout, unlike
-// Remotion's <Img>, so a slow generator (e.g. Pollinations) can't fail a render.
+// Download an image, validating it's actually an image (Pollinations sometimes
+// returns a 200 with an error/empty body). Retries — it's flaky.
 async function httpDownload_(url, dest) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("HTTP " + res.status);
-  fs.writeFileSync(dest, Buffer.from(await res.arrayBuffer()));
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(url);
+      const ct = (res.headers.get("content-type") || "").toLowerCase();
+      if (res.ok && ct.indexOf("image/") === 0) {
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (buf.length > 1500) { fs.writeFileSync(dest, buf); return; } // a real image
+      }
+    } catch (e) { /* fall through to retry */ }
+    await new Promise(function (r) { setTimeout(r, 1500); });
+  }
+  throw new Error("no valid image returned after 3 tries");
 }
 
 function hashString_(s) {
