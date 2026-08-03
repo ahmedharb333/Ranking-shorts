@@ -22,7 +22,9 @@ function onOpen() {
       .addItem("2. Install automation (run once)", "installAutomation")
       .addSeparator()
       .addItem("⏸ Pause automation", "pauseAutomation")
-      .addItem("▶ Resume automation", "installAutomation"))
+      .addItem("▶ Resume automation", "installAutomation")
+      .addSeparator()
+      .addItem("⚠ Reset all data (start from 001)", "menu_resetAllData_"))
     .addSeparator()
     .addItem("▶ Start selected idea (generate script)", "menu_generateForActiveRow_")
     .addItem("▶ Run full tick now", "runPipelineTick")
@@ -75,6 +77,31 @@ function showSettings() {
     "Video mode:  " + getVideoMode_() + (p.getProperty("VIDEO_MODE") ? "" : "  (default)") + "\n" +
     "Kling model: " + getKlingModel_() + (p.getProperty("KLING_MODEL") ? "" : "  (default)");
   SpreadsheetApp.getUi().alert("Current settings", msg, SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+// Clears every data row (keeps headers) across all pipeline sheets, so IDs
+// start fresh from 001. Does NOT touch Drive files or published YouTube videos.
+function menu_resetAllData_() {
+  const ui = SpreadsheetApp.getUi();
+  const resp = ui.alert("Reset ALL pipeline data?",
+    "This clears every row (keeps headers) in the Idea Catalogue, Script Bank, " +
+    "Visual Library, Voiceover Bank, Assembly Tracker, YouTube Metadata, " +
+    "Publishing Tracker, and Error Log — so new video IDs start at 001.\n\n" +
+    "It does NOT delete Drive folders or published YouTube videos (do those " +
+    "yourself). Continue?", ui.ButtonSet.YES_NO);
+  if (resp !== ui.Button.YES) return;
+
+  const names = [SHEET.IDEA, SHEET.SCRIPT, SHEET.VISUAL, SHEET.AUDIO,
+    SHEET.ASSEMBLY, SHEET.YOUTUBE, SHEET.PUBLISHING, SHEET.ERROR_LOG];
+  const ss = SpreadsheetApp.getActive();
+  names.forEach(function (name) {
+    const sh = ss.getSheetByName(name);
+    if (sh && sh.getLastRow() > 1) {
+      sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn()).clearContent();
+    }
+  });
+  ui.alert("Done — all pipeline data cleared. The next topic refill starts at 001. " +
+    "(Delete old Drive folders manually if you want them gone.)");
 }
 
 // Starts the pipeline for the idea row you've selected in the Idea Catalogue
