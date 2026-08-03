@@ -203,10 +203,13 @@ ANGLES (each video has one):
 
 FORMAT RULES (mandatory):
 - Total spoken script: 120-160 words, 30-45 seconds read aloud
-- RANKING METRIC: choose exactly ONE measurable metric up front (e.g. price in
-  USD, Scoville units, cost index) and sort EVERY item by it consistently. #1 is
-  the extreme end of that metric (the highest / most). Each item's "fact" states
-  that item's value for the metric with a specific number, so the numbers never
+- RANKING METRIC: choose exactly ONE metric a viewer grasps INSTANTLY — a single
+  concrete dimension like price ($), spiciness (Scoville), size/weight, rarity,
+  age, or wait time. NEVER use an abstract or COMPOUND metric (e.g. "calories per
+  dollar", "value score", "X per Y") — if a viewer can't tell in one second what
+  is being ranked, pick a different metric. Sort EVERY item by it consistently;
+  #1 is the extreme end (the highest / most). Each item's "fact" states that
+  item's value for the metric with a specific number, so the numbers never
   contradict the rank order (a lower-ranked item must not out-number #1).
 - HOOK (first 1.5s / first line): state the single most surprising fact, and it
   MUST be about the #1 item. The headline number in the hook must EQUAL the #1

@@ -52,8 +52,9 @@ function stage1b_verifyFacts(scriptId) {
   const head = "You are fact-checking a ranking video BEFORE publication.\n\n" + grounding + "Items:\n" + JSON.stringify(lean) + "\n\n";
   const tail =
     "\nEach 'fact' <= 14 words, no filler, no [VERIFY] tags. 'on_screen_text' <= 6 words.\n" +
+    "ALSO return an updated 'hook' — one punchy line that works muted, ABOUT the FINAL #1 item, using ITS verified number, so the hook can never contradict the ranking.\n" +
     "Respond with ONLY strict JSON as your final message (no prose, no code fences):\n" +
-    '{"items":[{"rank":N,"name":"...","fact":"...","on_screen_text":"...","source":"https://..."}]}';
+    '{"hook":"...","items":[{"rank":N,"name":"...","fact":"...","on_screen_text":"...","source":"https://..."}]}';
 
   const prompt = isPerspective
     ? head +
@@ -98,6 +99,10 @@ function stage1b_verifyFacts(scriptId) {
     verified.forEach(function (it, i) { it.rank = i + 1; }); // renumber #1..#N, #1 = most extreme
 
     sh.getRange(rowIdx, COL_SCRIPT.RANK_ITEMS_JSON).setValue(JSON.stringify(verified));
+    // Keep the hook in sync with the (possibly re-ranked/corrected) #1 item.
+    if (parsed.hook && String(parsed.hook).trim()) {
+      sh.getRange(rowIdx, COL_SCRIPT.HOOK).setValue(String(parsed.hook).trim());
+    }
     sh.getRange(rowIdx, COL_SCRIPT.STATUS).setValue("Verified");
     return true;
   } catch (err) {
