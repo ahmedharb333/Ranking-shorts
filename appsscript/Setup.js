@@ -8,6 +8,9 @@
    Optional: USDA_API_KEY (free api.data.gov key) enables USDA food-nutrition
    grounding in the fact-verification stage; without it, food facts fall back to
    web search. Countries grounding (World Bank) needs no key.
+   Optional: YOUTUBE_API_KEY (YouTube Data API v3 key, same Cloud project as the
+   upload OAuth) enables the YouTube trend signal in the topic picker; without
+   it, only Google Trends (best-effort) feeds trends.
    Then run installAutomation() once. That's the entire manual setup.
    ============================================================================ */
 

@@ -51,7 +51,14 @@ function stage0_refillTopicQueue() {
       .filter(function (r) { return r[COL_IDEA.NICHE - 1] === niche && r[COL_IDEA.STATUS - 1] === "Queued"; }).length;
     if (queuedCount >= 3) return; // keep a buffer of 3 per niche, don't over-generate
 
+    // Legal trend signals (YouTube Data API + Google Trends) as inspiration.
+    const trends = getTrendSignals_(niche);
+    const trendBlock = trends.length
+      ? "For inspiration, here's what's currently trending / performing well on this topic (take inspiration for angles, but create DISTINCT new ideas — do NOT copy these):\n" + trends.join("\n") + "\n"
+      : "";
+
     const prompt = "Suggest 3 new specific video topics for the '" + niche + "' ranking pillar.\n" +
+      trendBlock +
       "Avoid these already-used titles — do NOT repeat OR reword them:\n" + avoid.join("\n") + "\n" +
       "Avoid these killed/underperforming topics too:\n" + killed.join("\n") + "\n" +
       "Return strict JSON: {\"topics\":[{\"title\":\"...\",\"angle\":\"countdown|comparison|myth-bust|perspective\"}]}";

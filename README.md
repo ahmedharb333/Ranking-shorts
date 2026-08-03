@@ -49,6 +49,7 @@ Daily email digest ONLY if something failed — otherwise total silence
 | `REMOTION_SERVER_URL` | set after step 3 |
 | `DRIVE_FOLDER_ID` | your production folder's ID (same as the render server's .env) |
 | `USDA_API_KEY` *(optional)* | api.data.gov — enables USDA food-nutrition grounding |
+| `YOUTUBE_API_KEY` *(optional)* | Google Cloud Console (YouTube Data API v3) — enables the YouTube trend signal in the topic picker |
 
 **YouTube OAuth refresh token (one-time):** create a project in Google Cloud
 Console, enable "YouTube Data API v3", create OAuth Client ID (Desktop app),
