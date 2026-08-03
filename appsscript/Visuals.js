@@ -50,50 +50,36 @@ function fetchPexelsClip_(query, contentId) {
 }
 
 // ── Kling auth ─────────────────────────────────────────────────────────────
-// Kling does NOT use a simple API key. It issues an Access Key + Secret Key,
-// and every request needs a short-lived JWT (HS256) signed with the secret:
-//   header: {alg: "HS256", typ: "JWT"}
-//   payload: {iss: accessKey, exp: now+1800s, nbf: now-5s}
-// Apps Script has no JWT library, so we build it manually with
-// Utilities.computeHmacSha256Signature + base64url encoding.
-function buildKlingJwt_() {
-  const accessKey = PropertiesService.getScriptProperties().getProperty("KLING_ACCESS_KEY");
-  const secretKey = PropertiesService.getScriptProperties().getProperty("KLING_SECRET_KEY");
-  if (!accessKey || !secretKey) throw new Error("KLING_ACCESS_KEY / KLING_SECRET_KEY missing from Script Properties");
-
-  const nowSec = Math.floor(Date.now() / 1000);
-  const header = { alg: "HS256", typ: "JWT" };
-  const payload = { iss: accessKey, exp: nowSec + 1800, nbf: nowSec - 5 };
-
-  const base64url = function (obj) {
-    return Utilities.base64EncodeWebSafe(JSON.stringify(obj)).replace(/=+$/, "");
-  };
-
-  const unsigned = base64url(header) + "." + base64url(payload);
-  const sigBytes = Utilities.computeHmacSha256Signature(unsigned, secretKey);
-  const signature = Utilities.base64EncodeWebSafe(sigBytes).replace(/=+$/, "");
-
-  return unsigned + "." + signature;
+// New-format Kling API key (from kling.ai/dev/api-key): passed directly as a
+// Bearer token — no JWT signing (that was the legacy Access/Secret Key flow).
+function klingAuthToken_() {
+  const key = PropertiesService.getScriptProperties().getProperty("KLING_API_KEY");
+  if (!key) throw new Error("KLING_API_KEY missing from Script Properties");
+  return key;
 }
 
 function submitKlingJob_(prompt) {
-  const jwt = buildKlingJwt_();
   const res = UrlFetchApp.fetch(KLING_API_URL, {
     method: "post",
     contentType: "application/json",
-    headers: { Authorization: "Bearer " + jwt },
-    payload: JSON.stringify({ model: KLING_MODEL, prompt: prompt, aspect_ratio: "9:16" }),
+    headers: { Authorization: "Bearer " + klingAuthToken_() },
+    // Send both model + model_name — Kling's docs disagree on the field name and
+    // REST APIs ignore unknown fields. Validate against a real response on run 1.
+    payload: JSON.stringify({ model: KLING_MODEL, model_name: KLING_MODEL, prompt: prompt, aspect_ratio: "9:16", duration: 5 }),
     muteHttpExceptions: true
   });
-  const data = JSON.parse(res.getContentText());
-  if (!data.task_id) throw new Error("Kling submission failed: " + res.getContentText().slice(0, 300));
-  return data.task_id;
+  const body = res.getContentText();
+  const data = JSON.parse(body);
+  // Official API nests the task under "data"; some wrappers keep it flat.
+  const taskId = (data.data && data.data.task_id) || data.task_id;
+  if (!taskId) throw new Error("Kling submission failed: " + body.slice(0, 300));
+  return taskId;
 }
 
 function pollPendingKlingJobs_() {
   const sh = SpreadsheetApp.getActive().getSheetByName(SHEET.VISUAL);
   const data = sh.getDataRange().getValues();
-  const jwt = buildKlingJwt_(); // one fresh token covers all polls this tick (30 min validity)
+  const token = klingAuthToken_();
 
   for (let i = 1; i < data.length; i++) {
     if (data[i][COL_VISUAL.STATUS - 1] !== "Rendering") continue;
@@ -101,15 +87,24 @@ function pollPendingKlingJobs_() {
 
     try {
       const res = UrlFetchApp.fetch(KLING_API_URL + "/" + taskId, {
-        headers: { Authorization: "Bearer " + jwt }, muteHttpExceptions: true
+        headers: { Authorization: "Bearer " + token }, muteHttpExceptions: true
       });
-      const data2 = JSON.parse(res.getContentText());
-      if (data2.status === "succeed" && data2.video_url) {
-        const driveUrl = saveUrlToDrive_(data2.video_url, "kling_" + taskId + ".mp4", data[i][COL_VISUAL.ID - 1]);
+      const j = JSON.parse(res.getContentText());
+      const d = j.data || j; // official API nests under "data"
+      const status = d.task_status || d.status || "";
+      // Video URL lives at task_result.videos[0].url (official) or video_url (flat).
+      const videoUrl = (d.task_result && d.task_result.videos && d.task_result.videos[0] && d.task_result.videos[0].url)
+        || d.video_url || "";
+
+      if ((status === "succeed" || status === "completed") && videoUrl) {
+        const driveUrl = saveUrlToDrive_(videoUrl, "kling_" + taskId + ".mp4", data[i][COL_VISUAL.ID - 1]);
         sh.getRange(i + 1, COL_VISUAL.CLIP_URL).setValue(driveUrl);
         sh.getRange(i + 1, COL_VISUAL.STATUS).setValue("Ready");
+      } else if (status === "failed") {
+        sh.getRange(i + 1, COL_VISUAL.STATUS).setValue("Failed");
+        logError("Stage 2B — Kling Poll", taskId, "Render Failed", d.task_status_msg || "Kling reported failed");
       }
-      // else: still rendering, leave as-is, checked again next tick
+      // else still rendering — checked again next tick
     } catch (err) {
       logError("Stage 2B — Kling Poll", taskId, "Poll Error", err.message);
     }
