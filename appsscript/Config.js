@@ -139,7 +139,7 @@ const PEXELS_API_URL = "https://api.pexels.com/videos/search";
 
 // ── Kling / Veo (used only for the #1 "hero" reveal shot per video) ──────────
 const KLING_API_URL        = "https://api.klingai.com/v1/videos/text2video";
-const KLING_MODEL          = "kling-v2";
+const KLING_MODEL          = "kling-v1"; // ~$0.18/5s clip — cheap enough to stretch trial packs; fine for background reveal shots
 const KLING_POLL_INTERVAL  = 15000;
 const KLING_MAX_POLLS      = 40;
 // Visual source mode — controls the Pexels/Kling mix:
