@@ -36,8 +36,15 @@ function nextQueuedIdea_() {
 // so a sub-topic marked "Kill" doesn't get repeated.
 function stage0_refillTopicQueue() {
   const sh = SpreadsheetApp.getActive().getSheetByName(SHEET.IDEA);
-  const existing = sh.getDataRange().getValues().slice(1).map(function (r) { return r[COL_IDEA.WORKING_TITLE - 1]; });
+  // Wider avoid-list: every idea title ever queued + every published title.
+  const ideaTitles = sh.getDataRange().getValues().slice(1)
+    .map(function (r) { return r[COL_IDEA.WORKING_TITLE - 1]; }).filter(function (x) { return x; });
+  const avoid = ideaTitles.concat(getPublishedTitles_());
   const killed = getKilledTopics_();
+
+  // Hard-dedup set: normalized titles already used (also blocks intra-batch dupes).
+  const seen = {};
+  avoid.forEach(function (t) { seen[normalizeTitle_(t)] = true; });
 
   NICHES.forEach(function (niche) {
     const queuedCount = sh.getDataRange().getValues().slice(1)
@@ -45,8 +52,8 @@ function stage0_refillTopicQueue() {
     if (queuedCount >= 3) return; // keep a buffer of 3 per niche, don't over-generate
 
     const prompt = "Suggest 3 new specific video topics for the '" + niche + "' ranking pillar.\n" +
-      "Avoid these already-used titles:\n" + existing.join("\n") + "\n" +
-      "Avoid these killed/underperforming sub-topics:\n" + killed.join("\n") + "\n" +
+      "Avoid these already-used titles — do NOT repeat OR reword them:\n" + avoid.join("\n") + "\n" +
+      "Avoid these killed/underperforming topics too:\n" + killed.join("\n") + "\n" +
       "Return strict JSON: {\"topics\":[{\"title\":\"...\",\"angle\":\"countdown|comparison|myth-bust|perspective\"}]}";
 
     try {
@@ -55,6 +62,9 @@ function stage0_refillTopicQueue() {
       const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd");
       let seq = nextSeqForNicheDate_(sh, niche, today);
       parsed.topics.forEach(function (t) {
+        const norm = normalizeTitle_(t.title);
+        if (!norm || seen[norm]) return; // HARD DEDUP: skip exact/normalized repeats
+        seen[norm] = true;
         // Human-readable ID: niche-YYYYMMDD-NNN, counted per niche per day.
         const id = niche.toLowerCase() + "-" + today + "-" + pad3_(seq);
         seq++;
@@ -64,6 +74,36 @@ function stage0_refillTopicQueue() {
       logError("Stage 0 — Topic Pick", niche, "API Error", err.message);
     }
   });
+}
+
+// Normalizes a title for duplicate comparison: lowercase, punctuation stripped.
+function normalizeTitle_(t) {
+  return String(t || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+// Maps content ID -> title (Script Bank title preferred, else Idea working title).
+function idTitleMap_() {
+  const map = {};
+  const idea = SpreadsheetApp.getActive().getSheetByName(SHEET.IDEA);
+  if (idea) idea.getDataRange().getValues().slice(1).forEach(function (r) {
+    if (r[COL_IDEA.ID - 1]) map[r[COL_IDEA.ID - 1]] = r[COL_IDEA.WORKING_TITLE - 1];
+  });
+  const script = SpreadsheetApp.getActive().getSheetByName(SHEET.SCRIPT);
+  if (script) script.getDataRange().getValues().slice(1).forEach(function (r) {
+    if (r[COL_SCRIPT.ID - 1] && r[COL_SCRIPT.TITLE - 1]) map[r[COL_SCRIPT.ID - 1]] = r[COL_SCRIPT.TITLE - 1];
+  });
+  return map;
+}
+
+// Titles of everything already published (Publishing Tracker IDs -> titles).
+function getPublishedTitles_() {
+  const pub = SpreadsheetApp.getActive().getSheetByName(SHEET.PUBLISHING);
+  if (!pub) return [];
+  const ids = pub.getDataRange().getValues().slice(1)
+    .map(function (r) { return r[COL_PUBLISHING.ID - 1]; }).filter(function (x) { return x; });
+  if (!ids.length) return [];
+  const titleById = idTitleMap_();
+  return ids.map(function (id) { return titleById[id]; }).filter(function (x) { return x; });
 }
 
 // Next sequence number for a niche on a given day (scans existing IDs).
@@ -89,9 +129,14 @@ function pad3_(n) {
 function getKilledTopics_() {
   const sh = SpreadsheetApp.getActive().getSheetByName(SHEET.PUBLISHING);
   if (!sh) return [];
-  return sh.getDataRange().getValues().slice(1)
+  const killedIds = sh.getDataRange().getValues().slice(1)
     .filter(function (r) { return r[COL_PUBLISHING.REPEAT_DECISION - 1] === "Kill"; })
     .map(function (r) { return r[COL_PUBLISHING.ID - 1]; });
+  if (!killedIds.length) return [];
+  // Resolve IDs -> real titles so Claude can actually avoid the topic (an
+  // opaque ID like "food-20260803-001" is useless as an avoid instruction).
+  const titleById = idTitleMap_();
+  return killedIds.map(function (id) { return titleById[id] || null; }).filter(function (x) { return x; });
 }
 
 // ── STAGE 1 — Script Generation ───────────────────────────────────────────────
