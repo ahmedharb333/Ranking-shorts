@@ -40,18 +40,19 @@ if (!fs.existsSync(CLIPS_DIR)) fs.mkdirSync(CLIPS_DIR, { recursive: true });
 // loaded by Remotion's headless Chrome (ORB/403). Download them via the
 // authenticated Drive client and hand the renderer a localhost URL instead.
 // Non-Drive URLs (e.g. Pexels CDN) are returned unchanged — they load fine.
-async function resolveClipUrl(clipUrl) {
+async function resolveClipUrl(clipUrl, mediaType) {
   if (!clipUrl || !/drive\.google\.com/.test(clipUrl)) return clipUrl;
   const fileId = driveUpload.extractDriveFileId(clipUrl);
   if (!fileId) return clipUrl;
   if (!driveUpload.isDriveAuthAvailable()) {
-    console.warn(`[clips] Drive clip ${clipUrl} needs auth to download but Drive is not authorized — leaving as-is (render will likely fail).`);
+    console.warn(`[clips] Drive media ${clipUrl} needs auth to download but Drive is not authorized — leaving as-is (render will likely fail).`);
     return clipUrl;
   }
-  const localName = `${fileId}.mp4`;
+  const ext = mediaType === "image" ? ".jpg" : ".mp4"; // correct content-type when served
+  const localName = `${fileId}${ext}`;
   const localPath = path.join(CLIPS_DIR, localName);
   if (!fs.existsSync(localPath)) {
-    console.log(`[clips] downloading Drive clip ${fileId} -> clips/${localName}`);
+    console.log(`[clips] downloading Drive ${mediaType || "video"} ${fileId} -> clips/${localName}`);
     await driveUpload.downloadFromDrive(fileId, localPath);
   }
   return `http://localhost:${PORT}/clips/${localName}`;
@@ -93,7 +94,7 @@ app.post("/assemble/job", (req, res) => {
     // Resolve any Drive-hosted clip URLs to locally-served copies before render.
     const rankScenes = scenes.filter((s) => s.type === "rank");
     for (const s of rankScenes) {
-      s.clipUrl = await resolveClipUrl(s.clipUrl);
+      s.clipUrl = await resolveClipUrl(s.clipUrl, s.mediaType);
     }
 
     const inputProps = { title: title || contentId, hook: scenes.find((s) => s.type === "hook")?.onScreenText || "",

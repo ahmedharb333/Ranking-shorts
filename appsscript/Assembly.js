@@ -37,12 +37,14 @@ function stage4_submitAssembly(scriptId) {
   ].concat(rankItems.map(function (item, idx) {
     const visual = visualRows.find(function (v) { return Number(v[COL_VISUAL.RANK_ITEM_IDX - 1]) === idx; });
     const audio = audioFor(item.rank);
+    const source = visual ? visual[COL_VISUAL.SOURCE - 1] : "";
     return {
       type: "rank",
       rank: item.rank,
       name: item.name,
       onScreenText: item.on_screen_text,
       clipUrl: visual ? visual[COL_VISUAL.CLIP_URL - 1] : "",
+      mediaType: source === "aiimage" ? "image" : "video", // Ken Burns still vs. video clip
       audioUrl: audio.audioUrl,
       audioDurationSec: audio.audioDurationSec
     };

@@ -224,10 +224,13 @@ function stage2_buildVisualPlan(scriptId) {
 
   const videoMode = getVideoMode_();
   rankItems.forEach(function (item, idx) {
-    const useKling = videoMode === "all" || (videoMode === "hero" && item.rank === 1);
+    const isTop = item.rank === 1;
+    let source = "pexels";
+    if (videoMode === "all" || (videoMode === "hero" && isTop)) source = "kling";
+    else if (videoMode === "ai-image-all" || (videoMode === "ai-image" && isTop)) source = "aiimage";
     visualSh.appendRow([
       scriptId, idx, item.name + " " + (item.on_screen_text || ""),
-      useKling ? "kling" : "pexels", "", "", "Queued", ""
+      source, "", "", "Queued", ""
     ]);
   });
   return true;

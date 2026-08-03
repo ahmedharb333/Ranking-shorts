@@ -38,6 +38,8 @@ function onOpen() {
       .addItem("Video mode → None (all Pexels)", "menu_setVideoNone_")
       .addItem("Video mode → Hero (Kling #1)", "menu_setVideoHero_")
       .addItem("Video mode → All (Kling every item)", "menu_setVideoAll_")
+      .addItem("Video mode → AI image #1 (free)", "menu_setVideoAiImage_")
+      .addItem("Video mode → AI image all (free)", "menu_setVideoAiImageAll_")
       .addSeparator()
       .addItem("Kling model → v1 (cheap ~$0.18)", "menu_setKlingV1_")
       .addItem("Kling model → v2 (better, pricier)", "menu_setKlingV2_")
@@ -52,6 +54,8 @@ function onOpen() {
 function menu_setVideoNone_() { setProp_("VIDEO_MODE", "none", "Video mode → none (all Pexels stock)"); }
 function menu_setVideoHero_() { setProp_("VIDEO_MODE", "hero", "Video mode → hero (Kling AI for #1 only)"); }
 function menu_setVideoAll_()  { setProp_("VIDEO_MODE", "all", "Video mode → all (Kling AI for EVERY item — higher cost/slower)"); }
+function menu_setVideoAiImage_()    { setProp_("VIDEO_MODE", "ai-image", "Video mode → ai-image (FREE AI image for #1, Pexels for the rest)"); }
+function menu_setVideoAiImageAll_() { setProp_("VIDEO_MODE", "ai-image-all", "Video mode → ai-image-all (FREE AI image for EVERY item)"); }
 function menu_setKlingV1_()   { setProp_("KLING_MODEL", "kling-v1", "Kling model → kling-v1 (~$0.18/clip)"); }
 function menu_setKlingV2_()   { setProp_("KLING_MODEL", "kling-v2", "Kling model → kling-v2 (better quality, higher cost)"); }
 

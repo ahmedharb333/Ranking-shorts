@@ -25,6 +25,10 @@ function stage2b_resolveVisuals() {
         const taskId = submitKlingJob_(query);
         sh.getRange(i + 1, COL_VISUAL.KLING_TASK_ID).setValue(taskId);
         sh.getRange(i + 1, COL_VISUAL.STATUS).setValue("Rendering");
+      } else if (source === "aiimage") {
+        const url = fetchAiImage_(query, id);
+        sh.getRange(i + 1, COL_VISUAL.CLIP_URL).setValue(url);
+        sh.getRange(i + 1, COL_VISUAL.STATUS).setValue("Ready");
       }
     } catch (err) {
       logError("Stage 2B — Visuals", id, "Visual Fetch Error", err.message);
@@ -47,6 +51,17 @@ function fetchPexelsClip_(query, contentId) {
   const file = video.video_files.find(function (f) { return f.quality === "hd" && f.width < f.height; })
     || video.video_files[0];
   return saveUrlToDrive_(file.link, "pexels_" + video.id + ".mp4", contentId);
+}
+
+// ── AI image (free) ──────────────────────────────────────────────────────────
+// Pollinations.ai: free, no key. Generates a vertical image for the item and
+// saves it to Drive; the composition applies a slow Ken Burns zoom so it reads
+// as motion b-roll. Great for luxury/novelty subjects Pexels can't cover.
+function fetchAiImage_(query, contentId) {
+  const prompt = query + ", cinematic photography, dramatic lighting, ultra detailed, vertical";
+  const url = "https://image.pollinations.ai/prompt/" + encodeURIComponent(prompt) +
+    "?width=1080&height=1920&nologo=true&model=flux";
+  return saveUrlToDrive_(url, "aiimg_" + Utilities.getUuid().slice(0, 8) + ".jpg", contentId);
 }
 
 // ── Kling auth ─────────────────────────────────────────────────────────────

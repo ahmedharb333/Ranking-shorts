@@ -153,9 +153,13 @@ const KLING_MAX_POLLS      = 40;
 //            hard-to-stock topics; highest cost + slowest, all clips are async)
 // Fallback default; override live via menu (Script Property VIDEO_MODE).
 const VIDEO_MODE_DEFAULT = "hero";
+// Modes: "none" (all Pexels) | "hero"/"all" (Kling AI video for #1 / every item)
+//        | "ai-image"/"ai-image-all" (FREE Pollinations AI image + Ken Burns
+//        zoom for #1 / every item — no key, no cost, good for hard-to-stock subjects)
 function getVideoMode_() {
   const v = PropertiesService.getScriptProperties().getProperty("VIDEO_MODE");
-  return (v === "none" || v === "hero" || v === "all") ? v : VIDEO_MODE_DEFAULT;
+  const valid = { "none": 1, "hero": 1, "all": 1, "ai-image": 1, "ai-image-all": 1 };
+  return valid[v] ? v : VIDEO_MODE_DEFAULT;
 }
 
 // ── YouTube Data API ──────────────────────────────────────────────────────────

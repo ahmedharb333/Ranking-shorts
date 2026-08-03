@@ -3,6 +3,7 @@ import {
   AbsoluteFill,
   Sequence,
   Video,
+  Img,
   Audio,
   useCurrentFrame,
   interpolate,
@@ -19,8 +20,25 @@ export type Scene = {
   name: string;
   onScreenText: string;
   clipUrl: string;
+  mediaType?: "image" | "video"; // "image" → Ken Burns still; default video clip
   audioUrl: string;
   audioDurationSec: number;
+};
+
+// Slow zoom + drift on a still image so it reads as motion b-roll (used for
+// free AI-generated images instead of a video clip).
+const KenBurnsImage: React.FC<{ src: string }> = ({ src }) => {
+  const frame = useCurrentFrame();
+  const scale = interpolate(frame, [0, 240], [1.05, 1.28], { extrapolateRight: "clamp" });
+  const translateY = interpolate(frame, [0, 240], [0, -28], { extrapolateRight: "clamp" });
+  return (
+    <AbsoluteFill style={{ overflow: "hidden", backgroundColor: "black" }}>
+      <Img
+        src={src}
+        style={{ width: "100%", height: "100%", objectFit: "cover", transform: `scale(${scale}) translateY(${translateY}px)` }}
+      />
+    </AbsoluteFill>
+  );
 };
 
 export type RankingVideoProps = {
@@ -128,7 +146,9 @@ const Caption: React.FC<{ text: string }> = ({ text }) => {
 const RankScene: React.FC<{ scene: Scene }> = ({ scene }) => (
   <AbsoluteFill style={{ backgroundColor: "black" }}>
     {scene.clipUrl ? (
-      <Video src={scene.clipUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} muted />
+      scene.mediaType === "image"
+        ? <KenBurnsImage src={scene.clipUrl} />
+        : <Video src={scene.clipUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} muted />
     ) : null}
     <RankBadge rank={scene.rank} />
     {scene.name ? <NameTitle name={scene.name} /> : null}
