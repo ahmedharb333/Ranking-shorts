@@ -8,7 +8,13 @@ function stage2b_resolveVisuals() {
   const sh = SpreadsheetApp.getActive().getSheetByName(SHEET.VISUAL);
   const data = sh.getDataRange().getValues();
 
+  // AI-image generation is slow (~10-30s each). Cap this stage so it can't blow
+  // the tick's 6-min budget — remaining items resolve on the next tick.
+  const startedAt = Date.now();
+  const BUDGET_MS = 90 * 1000;
+
   for (let i = 1; i < data.length; i++) {
+    if (Date.now() - startedAt > BUDGET_MS) break;
     const status = data[i][COL_VISUAL.STATUS - 1];
     if (status !== "Queued") continue;
 
@@ -65,25 +71,23 @@ function fetchAiImage_(query, contentId) {
   const url = "https://image.pollinations.ai/prompt/" + encodeURIComponent(prompt) +
     "?width=1080&height=1920&nologo=true&model=flux";
 
-  // Try Pollinations (validated) a couple times; it occasionally returns a bad
-  // or empty body that would break the render.
-  for (var i = 0; i < 2; i++) {
-    try {
-      const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-      if (res.getResponseCode() === 200) {
-        const blob = res.getBlob();
-        if ((blob.getContentType() || "").indexOf("image/") === 0 && blob.getBytes().length > 1500) {
-          blob.setName("aiimg_" + Utilities.getUuid().slice(0, 8) + ".jpg");
-          const file = getContentFolder_(contentId).createFile(blob);
-          file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-          return "https://drive.google.com/uc?id=" + file.getId();
-        }
+  // One validated Pollinations attempt (it occasionally returns a bad/empty body
+  // that would break the render); on any problem, fall straight to Pexels to
+  // keep the stage fast.
+  try {
+    const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    if (res.getResponseCode() === 200) {
+      const blob = res.getBlob();
+      if ((blob.getContentType() || "").indexOf("image/") === 0 && blob.getBytes().length > 1500) {
+        blob.setName("aiimg_" + Utilities.getUuid().slice(0, 8) + ".jpg");
+        const file = getContentFolder_(contentId).createFile(blob);
+        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        return "https://drive.google.com/uc?id=" + file.getId();
       }
-    } catch (e) { /* retry */ }
-    Utilities.sleep(1500);
-  }
+    }
+  } catch (e) { /* fall through to Pexels */ }
 
-  // Fallback 1: a real Pexels stock PHOTO (free, instant, stays an image).
+  // Fallback: a real Pexels stock PHOTO (free, instant, stays an image).
   try { return fetchPexelsPhoto_(query, contentId); } catch (e) { /* fall through */ }
 
   // Last resort: no visual — the render shows a black scene with the overlays.

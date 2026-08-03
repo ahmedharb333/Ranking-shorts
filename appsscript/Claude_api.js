@@ -99,7 +99,7 @@ function callClaudeWithSearch(finalPrompt, maxSearches) {
       let text = "";
       let httpError = "";
 
-      for (let step = 0; step < 6; step++) {
+      for (let step = 0; step < 3; step++) { // bound pause_turn continuations so verify stays under the tick budget
         const payload = {
           model: ANTHROPIC_MODEL,
           max_tokens: 8000, // room for search reasoning + the full JSON answer
