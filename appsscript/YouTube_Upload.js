@@ -73,10 +73,15 @@ function stage5_uploadReadyVideos() {
 // its age window is reached; never overwrites an existing value. Retention is
 // not in the public Data API — leave that column for manual/Analytics entry.
 function stage6_updatePublishingStats() {
-  const key = PropertiesService.getScriptProperties().getProperty("YOUTUBE_API_KEY");
-  if (!key) return; // needs a Data API key (same one the trend picker uses)
   const sh = SpreadsheetApp.getActive().getSheetByName(SHEET.PUBLISHING);
   if (!sh) return;
+  fetchPublishingViews_(sh);      // auto-fill Views 24h/7d from the Data API
+  suggestRepeatDecisions_(sh);    // auto-suggest Scale/Hold/Kill from the data
+}
+
+function fetchPublishingViews_(sh) {
+  const key = PropertiesService.getScriptProperties().getProperty("YOUTUBE_API_KEY");
+  if (!key) return; // needs a Data API key (same one the trend picker uses)
   const data = sh.getDataRange().getValues();
   const now = Date.now();
 
@@ -113,6 +118,40 @@ function stage6_updatePublishingStats() {
     if (n.want24h) sh.getRange(n.row, COL_PUBLISHING.VIEWS_24H).setValue(views);
     if (n.want7d)  sh.getRange(n.row, COL_PUBLISHING.VIEWS_7D).setValue(views);
   });
+}
+
+// Auto-suggests a Repeat Decision from the numbers, ONLY for rows the user
+// hasn't decided yet (never overwrites a manual call). Marked "(auto-suggested)"
+// in the Note so it's clearly a starting point you can change.
+//   Kill  — 24h views below VIEWS_24H_KILL (a dead Short)
+//   Scale — 7d views clear VIEWS_7D_SCALE, or retention clears RETENTION_SCALE
+//   Hold  — matured (>=7d) without hitting either bar
+function suggestRepeatDecisions_(sh) {
+  const data = sh.getDataRange().getValues();
+  const now = Date.now();
+  for (let i = 1; i < data.length; i++) {
+    if (!data[i][COL_PUBLISHING.ID - 1]) continue;
+    if (data[i][COL_PUBLISHING.REPEAT_DECISION - 1]) continue; // respect an existing/manual decision
+
+    const pub = data[i][COL_PUBLISHING.PUBLISH_DATE - 1];
+    const ageH = pub ? (now - new Date(pub).getTime()) / 3600000 : 0;
+    const has24 = data[i][COL_PUBLISHING.VIEWS_24H - 1] !== "" && data[i][COL_PUBLISHING.VIEWS_24H - 1] != null;
+    const has7  = data[i][COL_PUBLISHING.VIEWS_7D - 1] !== "" && data[i][COL_PUBLISHING.VIEWS_7D - 1] != null;
+    const v24 = Number(data[i][COL_PUBLISHING.VIEWS_24H - 1]) || 0;
+    const v7  = Number(data[i][COL_PUBLISHING.VIEWS_7D - 1]) || 0;
+    const ret = Number(data[i][COL_PUBLISHING.RETENTION - 1]) || 0;
+
+    let decision = "";
+    if (has24 && ageH >= 24 && v24 < BENCHMARKS.VIEWS_24H_KILL) decision = "Kill";
+    else if ((has7 && v7 >= BENCHMARKS.VIEWS_7D_SCALE) || ret >= BENCHMARKS.RETENTION_SCALE) decision = "Scale";
+    else if (has7 && ageH >= 168) decision = "Hold";
+
+    if (decision) {
+      sh.getRange(i + 1, COL_PUBLISHING.REPEAT_DECISION).setValue(decision);
+      const note = data[i][COL_PUBLISHING.NOTE - 1];
+      sh.getRange(i + 1, COL_PUBLISHING.NOTE).setValue((note ? note + " " : "") + "(auto-suggested)");
+    }
+  }
 }
 
 function uploadToYoutube_(driveMp4Url, meta) {
