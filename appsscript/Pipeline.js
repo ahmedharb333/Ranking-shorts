@@ -59,11 +59,21 @@ function stage0_refillTopicQueue() {
     try {
       const raw = callClaude(prompt, "stage0_topic_pick");
       const parsed = parseClaudeJson(raw);
+
+      // 1) exact/normalized dedup
+      let candidates = (parsed.topics || []).filter(function (t) {
+        const norm = normalizeTitle_(t.title);
+        return norm && !seen[norm];
+      });
+      // 2) semantic dedup — catch reworded / same-idea repeats
+      candidates = filterSemanticDuplicates_(candidates, avoid);
+
+      // 3) queue the survivors
       const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd");
       let seq = nextSeqForNicheDate_(sh, niche, today);
-      parsed.topics.forEach(function (t) {
+      candidates.forEach(function (t) {
         const norm = normalizeTitle_(t.title);
-        if (!norm || seen[norm]) return; // HARD DEDUP: skip exact/normalized repeats
+        if (seen[norm]) return; // guard: two survivors could normalize the same
         seen[norm] = true;
         // Human-readable ID: niche-YYYYMMDD-NNN, counted per niche per day.
         const id = niche.toLowerCase() + "-" + today + "-" + pad3_(seq);
@@ -74,6 +84,27 @@ function stage0_refillTopicQueue() {
       logError("Stage 0 — Topic Pick", niche, "API Error", err.message);
     }
   });
+}
+
+// Semantic dedup: asks Claude which candidates are genuinely NEW vs. cover the
+// same idea as an existing title (reworded/synonyms/reordered). Fail-open — a
+// bad/empty response keeps all candidates, since exact dedup already ran.
+function filterSemanticDuplicates_(candidates, existingTitles) {
+  if (!candidates.length || !existingTitles.length) return candidates;
+  try {
+    const list = candidates.map(function (c, i) { return i + ". " + c.title; }).join("\n");
+    const prompt = "Deduplicate video topic ideas by MEANING, not wording.\n\n" +
+      "EXISTING topics (already made or queued):\n" + existingTitles.join("\n") + "\n\n" +
+      "CANDIDATE new topics:\n" + list + "\n\n" +
+      "A candidate is a DUPLICATE if it covers essentially the same ranking/subject as ANY existing " +
+      "topic — even if reworded, reordered, or using synonyms. Keep only genuinely distinct ideas.\n" +
+      "Return strict JSON with the indexes to KEEP: {\"keep\": [0, 2]}";
+    const parsed = parseClaudeJson(callClaude(prompt, "stage0_dedup"));
+    if (!parsed || !Array.isArray(parsed.keep)) return candidates; // malformed -> fail-open
+    return parsed.keep.map(function (i) { return candidates[i]; }).filter(function (x) { return x; });
+  } catch (e) {
+    return candidates; // never block topic generation on the dedup check
+  }
 }
 
 // Normalizes a title for duplicate comparison: lowercase, punctuation stripped.

@@ -6,6 +6,7 @@
 
 const STAGE_EFFORT = {
   "stage0_topic_pick" : "low",     // pick next topic from queue — cheap
+  "stage0_dedup"      : "low",     // semantic duplicate check — cheap classification
   "stage1_script"     : "medium",  // ranking script — needs some judgment
   "stage4_metadata"   : "low",     // YouTube title/desc/tags — formatting task
   "default"           : "medium"
