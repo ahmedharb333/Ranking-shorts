@@ -58,7 +58,10 @@ function fetchPexelsClip_(query, contentId) {
 // saves it to Drive; the composition applies a slow Ken Burns zoom so it reads
 // as motion b-roll. Great for luxury/novelty subjects Pexels can't cover.
 function fetchAiImage_(query, contentId) {
-  const prompt = query + ", cinematic photography, dramatic lighting, ultra detailed, vertical";
+  // Subject first (so the model renders the literal item), then a niche-neutral
+  // realistic style. "subject of the photo is" keeps the main noun dominant.
+  const prompt = "the subject of the photo is " + query +
+    ". photorealistic, sharp focus, high detail, professional photography, natural lighting, vertical 9:16";
   const url = "https://image.pollinations.ai/prompt/" + encodeURIComponent(prompt) +
     "?width=1080&height=1920&nologo=true&model=flux";
   return saveUrlToDrive_(url, "aiimg_" + Utilities.getUuid().slice(0, 8) + ".jpg", contentId);

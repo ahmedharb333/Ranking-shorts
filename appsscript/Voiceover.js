@@ -32,13 +32,21 @@ function stage3_generateVoiceover(scriptId) {
   return true;
 }
 
-// Removes internal review markers so they're never spoken aloud. Claude flags
-// low-confidence claims with [VERIFY] (see SYSTEM_CONTEXT); without this the
-// narrator literally reads "verify" after those facts. Strips bracketed/parens
-// verify/verified/unverified tags and tidies spacing.
+// Normalizes text for text-to-speech so the narrator reads it correctly:
+// strips internal review markers ([VERIFY]) and expands symbols/units/currency
+// that TTS otherwise mangles ("$8.50" -> "8.50 dollars", "SHU" -> "Scoville",
+// "12%" -> "12 percent", "#1" -> "number 1"). Comma-grouped numbers like
+// "135,600" already read fine, so we leave those.
 function cleanTtsText_(text) {
   return String(text || "")
-    .replace(/[\[\(]\s*(?:un)?verif(?:y|ied)?\s*[\]\)]/gi, " ")
+    .replace(/[\[\(]\s*(?:un)?verif(?:y|ied)?\s*[\]\)]/gi, " ") // review tags
+    .replace(/\$\s?(\d[\d.,]*)/g, "$1 dollars")                  // $8.50 -> 8.50 dollars
+    .replace(/(\d[\d.,]*)\s?%/g, "$1 percent")                   // 12% -> 12 percent
+    .replace(/\bSHU\b/gi, "Scoville")                            // 135,600 SHU -> Scoville
+    .replace(/\bkm\b/gi, "kilometers")
+    .replace(/(^|[\s(])#(\d)/g, "$1number $2")                   // #1 -> number 1
+    .replace(/&/g, " and ")
+    .replace(/[·•|/]+/g, " , ")                                  // separators -> a pause
     .replace(/\s+([.,!?;:])/g, "$1")
     .replace(/\s{2,}/g, " ")
     .trim();
