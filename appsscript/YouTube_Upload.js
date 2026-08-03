@@ -89,7 +89,7 @@ function stage5_uploadReadyVideos() {
 
     try {
       const slot = nextPublishSlot_(); // scheduled go-live time (or null = publish now)
-      const videoId = uploadToYoutube_(mp4Url, meta, slot ? slot.toISOString() : null);
+      const videoId = uploadToYoutube_(mp4Url, meta, slot ? slot.toISOString() : null, scriptId);
       SpreadsheetApp.getActive().getSheetByName(SHEET.PUBLISHING)
         .appendRow([scriptId, slot || new Date(), videoId, "", "", "", "", ""]);
       summary.uploaded++;
@@ -188,7 +188,25 @@ function suggestRepeatDecisions_(sh) {
   }
 }
 
-function uploadToYoutube_(driveMp4Url, meta, publishAtIso) {
+// Adds the uploaded video to its niche playlist. Playlist IDs live in Script
+// Properties PLAYLIST_FOOD / PLAYLIST_PLACES / PLAYLIST_COUNTRIES. No-op if the
+// niche's property isn't set. Needs the youtube.force-ssl scope (already granted).
+function addToNichePlaylist_(videoId, contentId, accessToken) {
+  const niche = String(contentId || "").split("-")[0].toUpperCase(); // FOOD / PLACES / COUNTRIES
+  const playlistId = PropertiesService.getScriptProperties().getProperty("PLAYLIST_" + niche);
+  if (!playlistId) return;
+  UrlFetchApp.fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet", {
+    method: "post",
+    contentType: "application/json",
+    headers: { Authorization: "Bearer " + accessToken },
+    payload: JSON.stringify({
+      snippet: { playlistId: playlistId, resourceId: { kind: "youtube#video", videoId: videoId } }
+    }),
+    muteHttpExceptions: true
+  });
+}
+
+function uploadToYoutube_(driveMp4Url, meta, publishAtIso, contentId) {
   const accessToken = getYoutubeAccessToken_();
   const fileId = extractDriveFileId_(driveMp4Url);
   const fileBlob = DriveApp.getFileById(fileId).getBlob();
@@ -235,6 +253,11 @@ function uploadToYoutube_(driveMp4Url, meta, publishAtIso) {
   try {
     postFirstComment_(accessToken, data.id, meta[COL_YOUTUBE.FIRST_COMMENT - 1]);
   } catch (e) { /* non-fatal — video is already up */ }
+
+  // Add to the niche playlist (Food/Places/Countries), if one is configured.
+  try {
+    addToNichePlaylist_(data.id, contentId, accessToken);
+  } catch (e) { /* non-fatal */ }
 
   return data.id;
 }
