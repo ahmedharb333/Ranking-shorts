@@ -57,8 +57,14 @@ function stage0_refillTopicQueue() {
       ? "For inspiration, here's what's currently trending / performing well on this topic (take inspiration for angles, but create DISTINCT new ideas — do NOT copy these):\n" + trends.join("\n") + "\n"
       : "";
 
+    // Your own winners: double down on what already worked for this channel.
+    const winners = getWinnerTopics_(niche);
+    const winnerBlock = winners.length
+      ? "YOUR best-performing videos so far — lean INTO these winning angles and make MORE like them (still distinct new topics, not repeats):\n" + winners.join("\n") + "\n"
+      : "";
+
     const prompt = "Suggest 3 new specific video topics for the '" + niche + "' ranking pillar.\n" +
-      trendBlock +
+      winnerBlock + trendBlock +
       "Avoid these already-used titles — do NOT repeat OR reword them:\n" + avoid.join("\n") + "\n" +
       "Avoid these killed/underperforming topics too:\n" + killed.join("\n") + "\n" +
       "Return strict JSON: {\"topics\":[{\"title\":\"...\",\"angle\":\"countdown|comparison|myth-bust|perspective\"}]}";
@@ -129,6 +135,16 @@ function idTitleMap_() {
   const script = SpreadsheetApp.getActive().getSheetByName(SHEET.SCRIPT);
   if (script) script.getDataRange().getValues().slice(1).forEach(function (r) {
     if (r[COL_SCRIPT.ID - 1] && r[COL_SCRIPT.TITLE - 1]) map[r[COL_SCRIPT.ID - 1]] = r[COL_SCRIPT.TITLE - 1];
+  });
+  return map;
+}
+
+// Maps content ID -> niche (from the Idea Catalogue).
+function idNicheMap_() {
+  const map = {};
+  const idea = SpreadsheetApp.getActive().getSheetByName(SHEET.IDEA);
+  if (idea) idea.getDataRange().getValues().slice(1).forEach(function (r) {
+    if (r[COL_IDEA.ID - 1]) map[r[COL_IDEA.ID - 1]] = r[COL_IDEA.NICHE - 1];
   });
   return map;
 }

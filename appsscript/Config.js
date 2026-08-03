@@ -167,8 +167,9 @@ const YOUTUBE_UPLOAD_URL = "https://www.googleapis.com/upload/youtube/v3/videos"
 
 // ── Performance thresholds (feed the topic picker's Scale/Kill decision) ─────
 const BENCHMARKS = {
-  RETENTION_SCALE : 50,   // % — Shorts retention to trigger "make more like this"
-  VIEWS_24H_KILL  : 300   // views in 24h below which we stop that sub-topic
+  RETENTION_SCALE : 50,     // % — Shorts retention to trigger "make more like this"
+  VIEWS_7D_SCALE  : 5000,   // views in 7d above which a topic counts as a "winner"
+  VIEWS_24H_KILL  : 300     // views in 24h below which we stop that sub-topic
 };
 
 // ── System prompt for script generation (Stage 1) ─────────────────────────────

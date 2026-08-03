@@ -21,6 +21,40 @@ function getTrendSignals_(niche) {
   return out;
 }
 
+// Your OWN winners: titles of this niche's best-performing published videos —
+// explicitly marked "Scale", or high retention / high 7-day views. Feeds the
+// topic picker so it doubles down on what works for YOUR channel.
+function getWinnerTopics_(niche) {
+  try {
+    const pub = SpreadsheetApp.getActive().getSheetByName(SHEET.PUBLISHING);
+    if (!pub) return [];
+    const rows = pub.getDataRange().getValues().slice(1);
+    if (!rows.length) return [];
+    const titleById = idTitleMap_();
+    const nicheById = idNicheMap_();
+
+    const winners = rows.map(function (r) {
+      const id = r[COL_PUBLISHING.ID - 1];
+      return {
+        id: id,
+        niche: nicheById[id] || "",
+        decision: String(r[COL_PUBLISHING.REPEAT_DECISION - 1] || ""),
+        retention: Number(r[COL_PUBLISHING.RETENTION - 1]) || 0,
+        views: Number(r[COL_PUBLISHING.VIEWS_7D - 1]) || Number(r[COL_PUBLISHING.VIEWS_24H - 1]) || 0
+      };
+    }).filter(function (w) {
+      if (niche && w.niche && w.niche !== niche) return false; // this niche's winners
+      return w.decision === "Scale" ||
+             w.retention >= BENCHMARKS.RETENTION_SCALE ||
+             w.views >= BENCHMARKS.VIEWS_7D_SCALE;
+    });
+    winners.sort(function (a, b) { return b.views - a.views; });
+    return winners.slice(0, 6).map(function (w) { return titleById[w.id]; }).filter(function (x) { return x; });
+  } catch (e) {
+    return [];
+  }
+}
+
 function nicheKeyword_(niche) {
   const map = { "Food": "street food", "Places": "places to visit", "Countries": "best countries to live" };
   return map[niche] || String(niche || "");
