@@ -111,7 +111,10 @@ const COL_ERROR = {
 const NICHES = ["Food", "Places", "Countries"];
 
 // ── Automation cadence ────────────────────────────────────────────────────────
-const VIDEOS_PER_DAY = 4;              // mid-point of your 3-5/day target
+// Daily output = DAILY_TOPICS_PER_NICHE × number of niches. With 2 and the 3
+// pillars (Food/Places/Countries), that's a hard 6 videos/day. Stage 0 counts
+// each niche's topics created today (by ID date) and stops at the quota.
+const DAILY_TOPICS_PER_NICHE = 2;
 const MAX_PIPELINE_RUNTIME_PER_TICK_MS = 5 * 60 * 1000; // stay under 6-min Apps Script cap
 
 // ── Google Drive folder structure ─────────────────────────────────────────────

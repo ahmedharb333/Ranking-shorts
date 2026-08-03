@@ -47,9 +47,10 @@ function stage0_refillTopicQueue() {
   avoid.forEach(function (t) { seen[normalizeTitle_(t)] = true; });
 
   NICHES.forEach(function (niche) {
-    const queuedCount = sh.getDataRange().getValues().slice(1)
-      .filter(function (r) { return r[COL_IDEA.NICHE - 1] === niche && r[COL_IDEA.STATUS - 1] === "Queued"; }).length;
-    if (queuedCount >= 3) return; // keep a buffer of 3 per niche, don't over-generate
+    const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd");
+    let seq = nextSeqForNicheDate_(sh, niche, today);      // next ID number for this niche today
+    const remaining = DAILY_TOPICS_PER_NICHE - (seq - 1);  // (seq-1) = topics already made today
+    if (remaining <= 0) return; // hit today's per-niche quota
 
     // Legal trend signals (YouTube Data API + Google Trends) as inspiration.
     const trends = getTrendSignals_(niche);
@@ -63,7 +64,7 @@ function stage0_refillTopicQueue() {
       ? "YOUR best-performing videos so far — lean INTO these winning angles and make MORE like them (still distinct new topics, not repeats):\n" + winners.join("\n") + "\n"
       : "";
 
-    const prompt = "Suggest 3 new specific video topics for the '" + niche + "' ranking pillar.\n" +
+    const prompt = "Suggest " + remaining + " new specific video topics for the '" + niche + "' ranking pillar.\n" +
       winnerBlock + trendBlock +
       "Avoid these already-used titles — do NOT repeat OR reword them:\n" + avoid.join("\n") + "\n" +
       "Avoid these killed/underperforming topics too:\n" + killed.join("\n") + "\n" +
@@ -81,10 +82,8 @@ function stage0_refillTopicQueue() {
       // 2) semantic dedup — catch reworded / same-idea repeats
       candidates = filterSemanticDuplicates_(candidates, avoid);
 
-      // 3) queue the survivors
-      const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd");
-      let seq = nextSeqForNicheDate_(sh, niche, today);
-      candidates.forEach(function (t) {
+      // 3) queue the survivors, capped to today's remaining quota for this niche
+      candidates.slice(0, remaining).forEach(function (t) {
         const norm = normalizeTitle_(t.title);
         if (seen[norm]) return; // guard: two survivors could normalize the same
         seen[norm] = true;
