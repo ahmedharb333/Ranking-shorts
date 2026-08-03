@@ -68,7 +68,7 @@ function stage1b_verifyFacts(scriptId) {
       "- Every item MUST include a real source URL you actually consulted." + tail;
 
   try {
-    const raw = callClaudeWithSearch(prompt, 8);
+    const raw = callClaudeWithSearch(prompt, 5); // cap web searches so verification stays well under Apps Script's 6-min limit
     const parsed = JSON.parse(extractJsonObject_(raw));
     if (!parsed.items || !parsed.items.length) throw new Error("Verifier returned no items");
 
