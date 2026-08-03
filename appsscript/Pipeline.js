@@ -98,7 +98,12 @@ function getKilledTopics_() {
 function stage1_generateScript() {
   const idea = nextQueuedIdea_();
   if (!idea) return false;
+  return generateScriptForIdea_(idea);
+}
 
+// Generates the script for a SPECIFIC idea (used by the automatic queue and by
+// the "Start selected idea" menu action, which can jump the queue).
+function generateScriptForIdea_(idea) {
   const prompt = "Niche: " + idea.niche + "\nWorking title: " + idea.title +
     "\nAngle: " + idea.angle + "\n\nWrite the full ranking video per the system format rules.";
 

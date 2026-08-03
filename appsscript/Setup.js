@@ -21,6 +21,7 @@ function onOpen() {
       .addItem("⏸ Pause automation", "pauseAutomation")
       .addItem("▶ Resume automation", "installAutomation"))
     .addSeparator()
+    .addItem("▶ Start selected idea (generate script)", "menu_generateForActiveRow_")
     .addItem("▶ Run full tick now", "runPipelineTick")
     .addSubMenu(ui.createMenu("Run one stage")
       .addItem("0 · Refill topic queue", "stage0_refillTopicQueue")
@@ -65,6 +66,41 @@ function showSettings() {
     "Video mode:  " + getVideoMode_() + (p.getProperty("VIDEO_MODE") ? "" : "  (default)") + "\n" +
     "Kling model: " + getKlingModel_() + (p.getProperty("KLING_MODEL") ? "" : "  (default)");
   SpreadsheetApp.getUi().alert("Current settings", msg, SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+// Starts the pipeline for the idea row you've selected in the Idea Catalogue
+// (jumps the queue). Generates its script now; the rest flows through on the
+// next ticks (or via "Run one stage").
+function menu_generateForActiveRow_() {
+  const ui = SpreadsheetApp.getUi();
+  const sh = SpreadsheetApp.getActive().getActiveSheet();
+  if (sh.getName() !== SHEET.IDEA) {
+    ui.alert("Open the '" + SHEET.IDEA + "' tab and click the idea row you want, then run this.");
+    return;
+  }
+  const row = sh.getActiveRange().getRow();
+  if (row < 2) { ui.alert("Pick an idea row (not the header)."); return; }
+
+  const vals = sh.getRange(row, 1, 1, COL_IDEA.NOTE).getValues()[0];
+  const idea = {
+    row: row,
+    id: vals[COL_IDEA.ID - 1],
+    niche: vals[COL_IDEA.NICHE - 1],
+    title: vals[COL_IDEA.WORKING_TITLE - 1],
+    angle: vals[COL_IDEA.ANGLE - 1]
+  };
+  if (!idea.id || !idea.title) { ui.alert("That row has no ID or Working Title."); return; }
+
+  if (findRowById_(SHEET.SCRIPT, idea.id, COL_SCRIPT.ID)) {
+    const resp = ui.alert("Already started",
+      "A script already exists for '" + idea.title + "'. Generate another anyway?", ui.ButtonSet.YES_NO);
+    if (resp !== ui.Button.YES) return;
+  }
+
+  const ok = generateScriptForIdea_(idea);
+  ui.alert(ok
+    ? "✅ Script generated for '" + idea.title + "'.\n\nIt will now flow through verify → visuals → voiceover → render on the next ticks (or push it with 'Run one stage')."
+    : "⚠️ Script generation failed for '" + idea.title + "' — check the Error Log tab.");
 }
 
 // ── Manual controls ──────────────────────────────────────────────────────────
