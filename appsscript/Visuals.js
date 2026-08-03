@@ -146,12 +146,25 @@ function getProductionFolder_() {
   return DriveApp.getFolderById(id);
 }
 
-// The per-video folder, named by contentId, created under the production folder.
+// The per-video folder, nested by niche:  <production>/<Niche>/<contentId>/
 function getContentFolder_(contentId) {
   if (!contentId) throw new Error("getContentFolder_ requires a contentId");
-  const parent = getProductionFolder_();
-  const it = parent.getFoldersByName(String(contentId));
-  return it.hasNext() ? it.next() : parent.createFolder(String(contentId));
+  const nicheFolder = getOrCreateChildFolder_(getProductionFolder_(), nicheFolderName_(contentId));
+  return getOrCreateChildFolder_(nicheFolder, String(contentId));
+}
+
+function getOrCreateChildFolder_(parent, name) {
+  const it = parent.getFoldersByName(name);
+  return it.hasNext() ? it.next() : parent.createFolder(name);
+}
+
+// Niche folder name from the contentId prefix (food-.. / places-.. / countries-..).
+function nicheFolderName_(contentId) {
+  const prefix = String(contentId).split("-")[0].toLowerCase();
+  for (var i = 0; i < NICHES.length; i++) {
+    if (NICHES[i].toLowerCase() === prefix) return NICHES[i];
+  }
+  return "Other";
 }
 
 // Handles both "https://drive.google.com/uc?id=XXX" (our own saveUrlToDrive_)

@@ -75,9 +75,17 @@ async function getOrCreateContentFolder(drive, contentId) {
     throw new Error("DRIVE_FOLDER_ID not set. Set it in .env: DRIVE_FOLDER_ID=your_folder_id");
   }
   const id = String(contentId || "").trim();
-  // Same per-video folder Apps Script creates for the source assets, so both
-  // sides converge on one folder per video.
-  return getOrCreateChildFolder(drive, PRODUCTION_FOLDER_ID, id);
+  // Nest by niche: <production>/<Niche>/<contentId> — the SAME per-video folder
+  // Apps Script creates for the source assets, so both sides converge.
+  const nicheFolderId = await getOrCreateChildFolder(drive, PRODUCTION_FOLDER_ID, nicheFolderName(id));
+  return getOrCreateChildFolder(drive, nicheFolderId, id);
+}
+
+// Niche folder name from the contentId prefix (food-.. / places-.. / countries-..).
+function nicheFolderName(contentId) {
+  const prefix = String(contentId).split("-")[0].toLowerCase();
+  const map = { food: "Food", places: "Places", countries: "Countries" };
+  return map[prefix] || "Other";
 }
 
 // Find-or-create a folder named `name` directly under `parentId`.
