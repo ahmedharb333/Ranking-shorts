@@ -38,6 +38,10 @@ function stage1b_verifyFacts(scriptId) {
   const angle = ideaRow ? String(ideaRow[COL_IDEA.ANGLE - 1] || "") : "";
   const isPerspective = angle.toLowerCase() === "perspective";
 
+  // How many times we've already tried to verify this script (stored in Note).
+  const noteVal = String(sh.getRange(rowIdx, COL_SCRIPT.NOTE).getValue() || "");
+  const attempt = ((parseInt((noteVal.match(/verify_attempt=(\d+)/) || [])[1], 10) || 0)) + 1;
+
   const rankItems = JSON.parse(sh.getRange(rowIdx, COL_SCRIPT.RANK_ITEMS_JSON).getValue());
   const lean = rankItems.map(function (it) { return { rank: it.rank, name: it.name, fact: it.fact }; });
 
@@ -66,6 +70,7 @@ function stage1b_verifyFacts(scriptId) {
       "For EACH item, use web search to verify the claim. Rules:\n" +
       "- If accurate, keep it but correct any numbers to a reputable, current source.\n" +
       "- If wrong, outdated, or unsourceable, REPLACE it with a DIFFERENT, specific, verifiable fact about the same item.\n" +
+      "- HARD RULE: NEVER return an item without a real source URL. If after searching you cannot source a claim, swap the whole item for a DIFFERENT one (a different food/place/country that fits the ranking) that you CAN source — do not leave anything unsourced.\n" +
       "- Every item MUST include a real source URL you actually consulted.\n" +
       "- CRITICAL — keep the RANKING internally consistent: the video ranks items by ONE metric (e.g. price). After correcting values, SORT the items by that metric so rank 1 is the MOST extreme (e.g. most expensive) and renumber ranks 1..N accordingly. If a corrected value no longer fits the ranking premise (e.g. it's actually cheap in a 'most expensive' list), REPLACE that item with a different verifiable one that DOES fit, so the numbers never contradict the rank order." + tail;
 
@@ -104,10 +109,23 @@ function stage1b_verifyFacts(scriptId) {
       sh.getRange(rowIdx, COL_SCRIPT.HOOK).setValue(String(parsed.hook).trim());
     }
     sh.getRange(rowIdx, COL_SCRIPT.STATUS).setValue("Verified");
+    sh.getRange(rowIdx, COL_SCRIPT.NOTE).setValue(""); // clear the retry marker
     return true;
   } catch (err) {
-    logError("Stage 1.5 — Verification", scriptId, "Verify Error", err.message);
-    sh.getRange(rowIdx, COL_SCRIPT.STATUS).setValue("Verify Failed");
+    logError("Stage 1.5 — Verification", scriptId, "Verify Error (attempt " + attempt + ")", err.message);
+    if (attempt < MAX_VERIFY_ATTEMPTS) {
+      // Keep the check tight but don't give up — re-verify next tick with a
+      // fresh web search (new sources), leaving Status "Ready" so it's re-picked.
+      sh.getRange(rowIdx, COL_SCRIPT.STATUS).setValue("Ready");
+      sh.getRange(rowIdx, COL_SCRIPT.NOTE).setValue("verify_attempt=" + attempt +
+        " — retrying with fresh sources (" + err.message.slice(0, 60) + ")");
+    } else {
+      // Genuinely unverifiable after several honest tries — park for review so
+      // it never publishes unverified and never loops forever.
+      sh.getRange(rowIdx, COL_SCRIPT.STATUS).setValue("Verify Failed");
+      sh.getRange(rowIdx, COL_SCRIPT.NOTE).setValue("verify_attempt=" + attempt +
+        " — gave up after " + MAX_VERIFY_ATTEMPTS + " attempts (" + err.message.slice(0, 60) + ")");
+    }
     return false;
   }
 }

@@ -172,6 +172,11 @@ const BENCHMARKS = {
   VIEWS_24H_KILL  : 300     // views in 24h below which we stop that sub-topic
 };
 
+// Verification retries with FRESH web searches before parking a script for
+// review — keeps the check tight (nothing unverified ever passes) without one
+// hard topic looping forever and burning API cost.
+const MAX_VERIFY_ATTEMPTS = 3;
+
 // ── System prompt for script generation (Stage 1) ─────────────────────────────
 const SYSTEM_CONTEXT = `You are the content engine for a faceless YouTube Shorts channel
 that publishes fast-paced ranking videos across three DISTINCT pillars:
