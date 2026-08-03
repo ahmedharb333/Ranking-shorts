@@ -64,7 +64,43 @@ function fetchAiImage_(query, contentId) {
     ". photorealistic, sharp focus, high detail, professional photography, natural lighting, vertical 9:16";
   const url = "https://image.pollinations.ai/prompt/" + encodeURIComponent(prompt) +
     "?width=1080&height=1920&nologo=true&model=flux";
-  return saveUrlToDrive_(url, "aiimg_" + Utilities.getUuid().slice(0, 8) + ".jpg", contentId);
+
+  // Try Pollinations (validated) a couple times; it occasionally returns a bad
+  // or empty body that would break the render.
+  for (var i = 0; i < 2; i++) {
+    try {
+      const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+      if (res.getResponseCode() === 200) {
+        const blob = res.getBlob();
+        if ((blob.getContentType() || "").indexOf("image/") === 0 && blob.getBytes().length > 1500) {
+          blob.setName("aiimg_" + Utilities.getUuid().slice(0, 8) + ".jpg");
+          const file = getContentFolder_(contentId).createFile(blob);
+          file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+          return "https://drive.google.com/uc?id=" + file.getId();
+        }
+      }
+    } catch (e) { /* retry */ }
+    Utilities.sleep(1500);
+  }
+
+  // Fallback 1: a real Pexels stock PHOTO (free, instant, stays an image).
+  try { return fetchPexelsPhoto_(query, contentId); } catch (e) { /* fall through */ }
+
+  // Last resort: no visual — the render shows a black scene with the overlays.
+  return "";
+}
+
+// Pexels PHOTO search (not video), saved to Drive — used as the AI-image fallback.
+function fetchPexelsPhoto_(query, contentId) {
+  const apiKey = PropertiesService.getScriptProperties().getProperty("PEXELS_API_KEY");
+  const res = UrlFetchApp.fetch(
+    "https://api.pexels.com/v1/search?orientation=portrait&per_page=1&query=" + encodeURIComponent(query),
+    { headers: { Authorization: apiKey }, muteHttpExceptions: true });
+  const data = JSON.parse(res.getContentText());
+  const photo = data.photos && data.photos[0];
+  if (!photo || !photo.src) throw new Error("No Pexels photo for: " + query);
+  const src = photo.src.large2x || photo.src.large || photo.src.original;
+  return saveUrlToDrive_(src, "pexels_photo_" + photo.id + ".jpg", contentId);
 }
 
 // ── Kling auth ─────────────────────────────────────────────────────────────
