@@ -67,6 +67,54 @@ function stage5_uploadReadyVideos() {
   }
 }
 
+// ── STAGE 6 — Auto-fetch view stats ──────────────────────────────────────────
+// Fills the Publishing Tracker's Views 24h / Views 7d from the YouTube Data API
+// so the Stage 0 "winners" loop learns automatically. Snapshots each metric once
+// its age window is reached; never overwrites an existing value. Retention is
+// not in the public Data API — leave that column for manual/Analytics entry.
+function stage6_updatePublishingStats() {
+  const key = PropertiesService.getScriptProperties().getProperty("YOUTUBE_API_KEY");
+  if (!key) return; // needs a Data API key (same one the trend picker uses)
+  const sh = SpreadsheetApp.getActive().getSheetByName(SHEET.PUBLISHING);
+  if (!sh) return;
+  const data = sh.getDataRange().getValues();
+  const now = Date.now();
+
+  const need = [];
+  for (let i = 1; i < data.length; i++) {
+    const videoId = data[i][COL_PUBLISHING.YOUTUBE_VIDEO_ID - 1];
+    if (!videoId) continue;
+    const pub = data[i][COL_PUBLISHING.PUBLISH_DATE - 1];
+    const ageH = pub ? (now - new Date(pub).getTime()) / 3600000 : 0;
+    const want24h = !data[i][COL_PUBLISHING.VIEWS_24H - 1] && ageH >= 24;
+    const want7d  = !data[i][COL_PUBLISHING.VIEWS_7D - 1]  && ageH >= 168;
+    if (want24h || want7d) need.push({ row: i + 1, videoId: videoId, want24h: want24h, want7d: want7d });
+  }
+  if (!need.length) return;
+
+  const stats = {};
+  for (let s = 0; s < need.length; s += 50) { // Data API allows up to 50 ids/call
+    const ids = need.slice(s, s + 50).map(function (n) { return n.videoId; }).join(",");
+    try {
+      const url = "https://www.googleapis.com/youtube/v3/videos?part=statistics&id=" +
+        encodeURIComponent(ids) + "&key=" + key;
+      const json = JSON.parse(UrlFetchApp.fetch(url, { muteHttpExceptions: true }).getContentText());
+      (json.items || []).forEach(function (it) {
+        stats[it.id] = it.statistics ? Number(it.statistics.viewCount) : null;
+      });
+    } catch (e) {
+      logError("Stage 6 — Stats", ids.slice(0, 40), "Stats Error", e.message);
+    }
+  }
+
+  need.forEach(function (n) {
+    const views = stats[n.videoId];
+    if (views == null || isNaN(views)) return;
+    if (n.want24h) sh.getRange(n.row, COL_PUBLISHING.VIEWS_24H).setValue(views);
+    if (n.want7d)  sh.getRange(n.row, COL_PUBLISHING.VIEWS_7D).setValue(views);
+  });
+}
+
 function uploadToYoutube_(driveMp4Url, meta) {
   const accessToken = getYoutubeAccessToken_();
   const fileId = extractDriveFileId_(driveMp4Url);

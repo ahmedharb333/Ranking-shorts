@@ -67,6 +67,9 @@ function runPipelineTick() {
 
   // 8. Upload anything fully rendered + has metadata.
   if (timeLeft() > 15000) stage5_uploadReadyVideos();
+
+  // 9. Refresh view stats for published videos (feeds the Stage 0 winners loop).
+  if (timeLeft() > 8000) stage6_updatePublishingStats();
 }
 
 // ── Helpers: find scripts that are ready for the NEXT stage but haven't
