@@ -46,10 +46,17 @@ export type RankingVideoProps = {
   hook: string;
   hookAudioUrl: string;
   ctaAudioUrl: string;
+  hookAudioDurationSec?: number;
+  ctaAudioDurationSec?: number;
   scenes: Scene[];
 };
 
 const FPS = 30;
+
+// Frames a scene should last to fit its audio, with a floor so silent/short
+// scenes still hold long enough to read. +15 frames of tail padding.
+const framesFor = (sec: number | undefined, minFrames: number): number =>
+  Math.max(minFrames, Math.round((sec || 0) * FPS) + 15);
 
 // ── Rank number that pops in with a spring ────────────────────────────────────
 const RankBadge: React.FC<{ rank: number }> = ({ rank }) => {
@@ -191,15 +198,15 @@ const CtaScene: React.FC<{ audioUrl: string }> = ({ audioUrl }) => (
 );
 
 // ── Top-level composition: stitches hook → scenes (high rank to #1) → CTA ───
-export const RankingVideo: React.FC<RankingVideoProps> = ({ hook, hookAudioUrl, ctaAudioUrl, scenes }) => {
-  const hookDurationFrames = 60; // ~2s, trimmed to real audio length at render time in calculateMetadata
+export const RankingVideo: React.FC<RankingVideoProps> = ({ hook, hookAudioUrl, ctaAudioUrl, hookAudioDurationSec, ctaAudioDurationSec, scenes }) => {
+  const hookDurationFrames = framesFor(hookAudioDurationSec, 60); // adapts to the hook voiceover length
   let cursor = hookDurationFrames;
 
   const sceneSequences = scenes
     .slice()
     .sort((a, b) => b.rank - a.rank) // countdown: highest number first, #1 last
     .map((scene) => {
-      const durationFrames = Math.max(60, Math.round(scene.audioDurationSec * FPS) + 15);
+      const durationFrames = framesFor(scene.audioDurationSec, 60);
       const from = cursor;
       cursor += durationFrames;
       return (
@@ -209,7 +216,7 @@ export const RankingVideo: React.FC<RankingVideoProps> = ({ hook, hookAudioUrl, 
       );
     });
 
-  const ctaDurationFrames = 90;
+  const ctaDurationFrames = framesFor(ctaAudioDurationSec, 90); // adapts to the CTA voiceover length
   const ctaFrom = cursor;
 
   return (
@@ -225,15 +232,16 @@ export const RankingVideo: React.FC<RankingVideoProps> = ({ hook, hookAudioUrl, 
   );
 };
 
-// Computes total duration from real scene audio lengths — called by
+// Computes total duration from real hook/scene/CTA audio lengths — called by
 // calculateMetadata in Root.tsx so the render isn't hardcoded to one length.
-export function computeDurationInFrames(scenes: Scene[]): number {
-  const hookFrames = 60;
-  const ctaFrames = 90;
-  const sceneFrames = scenes.reduce(
-    (sum, s) => sum + Math.max(60, Math.round(s.audioDurationSec * FPS) + 15),
-    0
-  );
+export function computeDurationInFrames(
+  scenes: Scene[],
+  hookAudioDurationSec?: number,
+  ctaAudioDurationSec?: number
+): number {
+  const hookFrames = framesFor(hookAudioDurationSec, 60);
+  const ctaFrames = framesFor(ctaAudioDurationSec, 90);
+  const sceneFrames = scenes.reduce((sum, s) => sum + framesFor(s.audioDurationSec, 60), 0);
   return hookFrames + sceneFrames + ctaFrames;
 }
 

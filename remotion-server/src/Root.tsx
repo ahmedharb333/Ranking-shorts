@@ -23,10 +23,18 @@ export const RemotionRoot: React.FC = () => {
         hook: "You've been ranking this wrong",
         hookAudioUrl: "",
         ctaAudioUrl: "",
+        hookAudioDurationSec: 0,
+        ctaAudioDurationSec: 0,
         scenes: [],
       } as RankingVideoProps}
       calculateMetadata={async ({ props }) => {
-        return { durationInFrames: computeDurationInFrames(props.scenes) };
+        return {
+          durationInFrames: computeDurationInFrames(
+            props.scenes,
+            props.hookAudioDurationSec,
+            props.ctaAudioDurationSec
+          ),
+        };
       }}
     />
   );

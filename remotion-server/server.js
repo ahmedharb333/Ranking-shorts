@@ -126,9 +126,13 @@ app.post("/assemble/job", (req, res) => {
       s.clipUrl = await resolveClipUrl(s.clipUrl, s.mediaType);
     }
 
-    const inputProps = { title: title || contentId, hook: scenes.find((s) => s.type === "hook")?.onScreenText || "",
-      hookAudioUrl: scenes.find((s) => s.type === "hook")?.audioUrl || "",
-      ctaAudioUrl: scenes.find((s) => s.type === "cta")?.audioUrl || "",
+    const hookScene = scenes.find((s) => s.type === "hook");
+    const ctaScene = scenes.find((s) => s.type === "cta");
+    const inputProps = { title: title || contentId, hook: hookScene?.onScreenText || "",
+      hookAudioUrl: hookScene?.audioUrl || "",
+      ctaAudioUrl: ctaScene?.audioUrl || "",
+      hookAudioDurationSec: hookScene?.audioDurationSec || 0,
+      ctaAudioDurationSec: ctaScene?.audioDurationSec || 0,
       scenes: rankScenes };
 
     const composition = await selectComposition({ serveUrl, id: "RankingVideo", inputProps, timeoutInMilliseconds: 60000 });
