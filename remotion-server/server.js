@@ -36,26 +36,55 @@ if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 const CLIPS_DIR = path.join(__dirname, "clips"); // Drive clips downloaded here, then served over localhost to the renderer
 if (!fs.existsSync(CLIPS_DIR)) fs.mkdirSync(CLIPS_DIR, { recursive: true });
 
-// Drive-hosted clip URLs (drive.google.com/uc?id=... from Visuals.js) can't be
-// loaded by Remotion's headless Chrome (ORB/403). Download them via the
-// authenticated Drive client and hand the renderer a localhost URL instead.
-// Non-Drive URLs (e.g. Pexels CDN) are returned unchanged — they load fine.
+// Localize media so the renderer never depends on a slow/blocked remote host:
+//  - Drive URLs can't be loaded by headless Chrome (ORB/403) — download via the
+//    authenticated Drive client.
+//  - IMAGES from any http host are downloaded too (Remotion <Img> has a
+//    delayRender timeout; a slow image host like an on-demand generator would
+//    time out the render).
+//  - Video URLs from non-Drive CDNs (e.g. Pexels) load fine directly.
 async function resolveClipUrl(clipUrl, mediaType) {
-  if (!clipUrl || !/drive\.google\.com/.test(clipUrl)) return clipUrl;
-  const fileId = driveUpload.extractDriveFileId(clipUrl);
-  if (!fileId) return clipUrl;
-  if (!driveUpload.isDriveAuthAvailable()) {
-    console.warn(`[clips] Drive media ${clipUrl} needs auth to download but Drive is not authorized — leaving as-is (render will likely fail).`);
+  if (!clipUrl || !/^https?:\/\//.test(clipUrl)) return clipUrl;
+  const isDrive = /drive\.google\.com/.test(clipUrl);
+  const isImage = mediaType === "image";
+
+  // Non-Drive videos load directly.
+  if (!isDrive && !isImage) return clipUrl;
+
+  try {
+    const ext = isImage ? ".jpg" : ".mp4";
+    const fileId = isDrive ? driveUpload.extractDriveFileId(clipUrl) : null;
+    const localName = (fileId || "img_" + hashString_(clipUrl)) + ext;
+    const localPath = path.join(CLIPS_DIR, localName);
+    if (!fs.existsSync(localPath)) {
+      if (isDrive) {
+        if (!fileId || !driveUpload.isDriveAuthAvailable()) return clipUrl;
+        console.log(`[clips] downloading Drive ${mediaType || "video"} ${fileId} -> clips/${localName}`);
+        await driveUpload.downloadFromDrive(fileId, localPath);
+      } else {
+        console.log(`[clips] downloading remote image -> clips/${localName}`);
+        await httpDownload_(clipUrl, localPath);
+      }
+    }
+    return `http://localhost:${PORT}/clips/${localName}`;
+  } catch (e) {
+    console.warn(`[clips] localize failed (${e.message}) — using remote URL as-is`);
     return clipUrl;
   }
-  const ext = mediaType === "image" ? ".jpg" : ".mp4"; // correct content-type when served
-  const localName = `${fileId}${ext}`;
-  const localPath = path.join(CLIPS_DIR, localName);
-  if (!fs.existsSync(localPath)) {
-    console.log(`[clips] downloading Drive ${mediaType || "video"} ${fileId} -> clips/${localName}`);
-    await driveUpload.downloadFromDrive(fileId, localPath);
-  }
-  return `http://localhost:${PORT}/clips/${localName}`;
+}
+
+// Plain HTTP download (for non-Drive images). No render-time timeout, unlike
+// Remotion's <Img>, so a slow generator (e.g. Pollinations) can't fail a render.
+async function httpDownload_(url, dest) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  fs.writeFileSync(dest, Buffer.from(await res.arrayBuffer()));
+}
+
+function hashString_(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h).toString(36);
 }
 
 const jobs = new Map(); // jobId -> { status, startedAt, result, error }
@@ -102,11 +131,11 @@ app.post("/assemble/job", (req, res) => {
       ctaAudioUrl: scenes.find((s) => s.type === "cta")?.audioUrl || "",
       scenes: rankScenes };
 
-    const composition = await selectComposition({ serveUrl, id: "RankingVideo", inputProps });
+    const composition = await selectComposition({ serveUrl, id: "RankingVideo", inputProps, timeoutInMilliseconds: 60000 });
     const filename = `${contentId}.mp4`;
     const outputPath = path.join(OUTPUT_DIR, filename);
 
-    await renderMedia({ composition, serveUrl, codec: "h264", outputLocation: outputPath, inputProps });
+    await renderMedia({ composition, serveUrl, codec: "h264", outputLocation: outputPath, inputProps, timeoutInMilliseconds: 60000 });
 
     const bytes = fs.statSync(outputPath).size;
 
