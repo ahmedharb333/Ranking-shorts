@@ -139,7 +139,10 @@ const PEXELS_API_URL = "https://api.pexels.com/videos/search";
 
 // ── Kling / Veo (used only for the #1 "hero" reveal shot per video) ──────────
 const KLING_API_URL        = "https://api.klingai.com/v1/videos/text2video";
-const KLING_MODEL          = "kling-v1"; // ~$0.18/5s clip — cheap enough to stretch trial packs; fine for background reveal shots
+const KLING_MODEL_DEFAULT   = "kling-v1"; // fallback; override live via menu (Script Property KLING_MODEL). ~$0.18/5s clip.
+function getKlingModel_() {
+  return PropertiesService.getScriptProperties().getProperty("KLING_MODEL") || KLING_MODEL_DEFAULT;
+}
 const KLING_POLL_INTERVAL  = 15000;
 const KLING_MAX_POLLS      = 40;
 // Visual source mode — controls the Pexels/Kling mix:
@@ -148,7 +151,12 @@ const KLING_MAX_POLLS      = 40;
 //            "wow" reveal is AI-generated so it can match a specific/luxury item)
 //   "all"  — Kling AI video for EVERY item (most unique look + best match for
 //            hard-to-stock topics; highest cost + slowest, all clips are async)
-const VIDEO_MODE = "hero";
+// Fallback default; override live via menu (Script Property VIDEO_MODE).
+const VIDEO_MODE_DEFAULT = "hero";
+function getVideoMode_() {
+  const v = PropertiesService.getScriptProperties().getProperty("VIDEO_MODE");
+  return (v === "none" || v === "hero" || v === "all") ? v : VIDEO_MODE_DEFAULT;
+}
 
 // ── YouTube Data API ──────────────────────────────────────────────────────────
 const YOUTUBE_UPLOAD_URL = "https://www.googleapis.com/upload/youtube/v3/videos";

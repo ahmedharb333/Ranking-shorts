@@ -33,9 +33,38 @@ function onOpen() {
       .addItem("4B · Poll renders", "stage4b_pollAssemblyJobs")
       .addItem("4.5 · YouTube metadata", "menu_stage45_")
       .addItem("5 · Upload ready videos", "stage5_uploadReadyVideos"))
+    .addSubMenu(ui.createMenu("Settings")
+      .addItem("Video mode → None (all Pexels)", "menu_setVideoNone_")
+      .addItem("Video mode → Hero (Kling #1)", "menu_setVideoHero_")
+      .addItem("Video mode → All (Kling every item)", "menu_setVideoAll_")
+      .addSeparator()
+      .addItem("Kling model → v1 (cheap ~$0.18)", "menu_setKlingV1_")
+      .addItem("Kling model → v2 (better, pricier)", "menu_setKlingV2_")
+      .addSeparator()
+      .addItem("Show current settings", "showSettings"))
     .addSeparator()
     .addItem("📊 Show pipeline status", "showPipelineStatus")
     .addToUi();
+}
+
+// ── Settings toggles (write Script Properties; read live via getters) ─────────
+function menu_setVideoNone_() { setProp_("VIDEO_MODE", "none", "Video mode → none (all Pexels stock)"); }
+function menu_setVideoHero_() { setProp_("VIDEO_MODE", "hero", "Video mode → hero (Kling AI for #1 only)"); }
+function menu_setVideoAll_()  { setProp_("VIDEO_MODE", "all", "Video mode → all (Kling AI for EVERY item — higher cost/slower)"); }
+function menu_setKlingV1_()   { setProp_("KLING_MODEL", "kling-v1", "Kling model → kling-v1 (~$0.18/clip)"); }
+function menu_setKlingV2_()   { setProp_("KLING_MODEL", "kling-v2", "Kling model → kling-v2 (better quality, higher cost)"); }
+
+function setProp_(key, value, msg) {
+  PropertiesService.getScriptProperties().setProperty(key, value);
+  SpreadsheetApp.getUi().alert(msg + "\n\nApplies to the next video generated.");
+}
+
+function showSettings() {
+  const p = PropertiesService.getScriptProperties();
+  const msg =
+    "Video mode:  " + getVideoMode_() + (p.getProperty("VIDEO_MODE") ? "" : "  (default)") + "\n" +
+    "Kling model: " + getKlingModel_() + (p.getProperty("KLING_MODEL") ? "" : "  (default)");
+  SpreadsheetApp.getUi().alert("Current settings", msg, SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
 // ── Manual controls ──────────────────────────────────────────────────────────
@@ -66,7 +95,8 @@ function showPipelineStatus() {
   const triggers = ScriptApp.getProjectTriggers().length;
 
   const msg =
-    "Automation: " + (triggers ? triggers + " trigger(s) — RUNNING" : "PAUSED") + "\n\n" +
+    "Automation: " + (triggers ? triggers + " trigger(s) — RUNNING" : "PAUSED") + "\n" +
+    "Video mode: " + getVideoMode_() + "  |  Kling model: " + getKlingModel_() + "\n\n" +
     "Idea queue:   " + count(SHEET.IDEA) + "\n" +
     "Scripts:      " + count(SHEET.SCRIPT) + "\n" +
     "Visuals:      " + count(SHEET.VISUAL) + "\n" +

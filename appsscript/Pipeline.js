@@ -141,8 +141,9 @@ function stage2_buildVisualPlan(scriptId) {
   const rankItems = JSON.parse(scriptRow[COL_VISUAL_ITEMS_JSON_INDEX(scriptRow)]);
   const visualSh = SpreadsheetApp.getActive().getSheetByName(SHEET.VISUAL);
 
+  const videoMode = getVideoMode_();
   rankItems.forEach(function (item, idx) {
-    const useKling = VIDEO_MODE === "all" || (VIDEO_MODE === "hero" && item.rank === 1);
+    const useKling = videoMode === "all" || (videoMode === "hero" && item.rank === 1);
     visualSh.appendRow([
       scriptId, idx, item.name + " " + (item.on_screen_text || ""),
       useKling ? "kling" : "pexels", "", "", "Queued", ""

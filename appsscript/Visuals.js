@@ -65,7 +65,7 @@ function submitKlingJob_(prompt) {
     headers: { Authorization: "Bearer " + klingAuthToken_() },
     // Send both model + model_name — Kling's docs disagree on the field name and
     // REST APIs ignore unknown fields. Validate against a real response on run 1.
-    payload: JSON.stringify({ model: KLING_MODEL, model_name: KLING_MODEL, prompt: prompt, aspect_ratio: "9:16", duration: 5 }),
+    payload: JSON.stringify((function () { const m = getKlingModel_(); return { model: m, model_name: m, prompt: prompt, aspect_ratio: "9:16", duration: 5 }; })()),
     muteHttpExceptions: true
   });
   const body = res.getContentText();
