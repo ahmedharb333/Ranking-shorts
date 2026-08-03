@@ -42,29 +42,35 @@ function buildSourcesBlock_(scriptRow) {
 }
 
 // ── STAGE 5 — Upload ──────────────────────────────────────────────────────────
+// Returns a summary {done, uploaded, alreadyPublished, noMetadata, errors} so the
+// menu can report what happened (the tick ignores the return value).
 function stage5_uploadReadyVideos() {
   const assemblySh = SpreadsheetApp.getActive().getSheetByName(SHEET.ASSEMBLY);
   const rows = assemblySh.getDataRange().getValues();
+  const summary = { done: 0, uploaded: 0, alreadyPublished: 0, noMetadata: 0, errors: 0 };
 
   for (let i = 1; i < rows.length; i++) {
     if (rows[i][COL_ASSEMBLY.STATUS - 1] !== "done") continue;
+    summary.done++;
     const scriptId = rows[i][COL_ASSEMBLY.ID - 1];
     const mp4Url = rows[i][COL_ASSEMBLY.MP4_URL - 1];
 
-    const alreadyPublished = findRowById_(SHEET.PUBLISHING, scriptId, COL_PUBLISHING.ID);
-    if (alreadyPublished) continue;
+    if (findRowById_(SHEET.PUBLISHING, scriptId, COL_PUBLISHING.ID)) { summary.alreadyPublished++; continue; }
 
     const meta = findRowById_(SHEET.YOUTUBE, scriptId, COL_YOUTUBE.ID);
-    if (!meta) continue; // Stage 4.5 hasn't run yet for this one
+    if (!meta) { summary.noMetadata++; continue; } // Stage 4.5 hasn't run yet for this one
 
     try {
       const videoId = uploadToYoutube_(mp4Url, meta);
-      const pubSh = SpreadsheetApp.getActive().getSheetByName(SHEET.PUBLISHING);
-      pubSh.appendRow([scriptId, new Date(), videoId, "", "", "", "", ""]);
+      SpreadsheetApp.getActive().getSheetByName(SHEET.PUBLISHING)
+        .appendRow([scriptId, new Date(), videoId, "", "", "", "", ""]);
+      summary.uploaded++;
     } catch (err) {
+      summary.errors++;
       logError("Stage 5 — Upload", scriptId, "Upload Error", err.message);
     }
   }
+  return summary;
 }
 
 // ── STAGE 6 — Auto-fetch view stats ──────────────────────────────────────────

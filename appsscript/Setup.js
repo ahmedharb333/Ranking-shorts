@@ -36,7 +36,7 @@ function onOpen() {
       .addItem("4 · Submit assembly", "menu_stage4Submit_")
       .addItem("4B · Poll renders", "stage4b_pollAssemblyJobs")
       .addItem("4.5 · YouTube metadata", "menu_stage45_")
-      .addItem("5 · Upload ready videos", "stage5_uploadReadyVideos")
+      .addItem("5 · Upload ready videos", "menu_stage5_")
       .addItem("6 · Update view stats", "stage6_updatePublishingStats"))
     .addSubMenu(ui.createMenu("Settings")
       .addItem("Video mode → None (all Pexels)", "menu_setVideoNone_")
@@ -122,6 +122,26 @@ function menu_stage4Submit_() {
   forEachAudioReadyScript_(function (id) {
     try { stage4_submitAssembly(id); } catch (err) { logError("Stage 4 — Submit", id, "Submit Error", err.message); }
   });
+}
+
+// Runs Stage 5 and reports exactly what happened (this is why "nothing seemed to
+// happen" — it uploads only videos that are rendered AND have metadata AND valid
+// YouTube OAuth keys).
+function menu_stage5_() {
+  const s = stage5_uploadReadyVideos();
+  let msg;
+  if (s.done === 0) {
+    msg = "Nothing to upload yet.\n\nNo 'done' rows in the Assembly Tracker — a video has to finish rendering (Stage 4) first.";
+  } else if (s.uploaded > 0) {
+    msg = "✅ Uploaded " + s.uploaded + " video(s) to YouTube.\nSee the Publishing Tracker.";
+  } else {
+    const parts = [];
+    if (s.noMetadata) parts.push(s.noMetadata + " have no YouTube Metadata yet — run 'Run one stage → 4.5'");
+    if (s.alreadyPublished) parts.push(s.alreadyPublished + " already published");
+    if (s.errors) parts.push(s.errors + " failed to upload — check the Error Log (usually missing/invalid YT_CLIENT_ID / YT_CLIENT_SECRET / YT_REFRESH_TOKEN)");
+    msg = s.done + " finished render(s), but 0 uploaded:\n\n- " + (parts.join("\n- ") || "reason unknown — check the Error Log");
+  }
+  SpreadsheetApp.getUi().alert("Upload ready videos", msg, SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
 function pauseAutomation() {
