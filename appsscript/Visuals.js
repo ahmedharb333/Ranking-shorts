@@ -73,8 +73,12 @@ function fetchAiImage_(query, contentId) {
     Countries: "iconic recognizable scenery of the place, cinematic wide establishing shot",
   };
   const style = styleByNiche[niche] || "photorealistic, professional photography, natural lighting";
+  // Hard negative constraints: AI-rendered text/flags/signage are unreliable and
+  // routinely wrong (e.g. French flags on an American cheese), and we add all real
+  // on-screen text in Remotion anyway — so suppress them globally.
+  const negatives = "No text, no lettering, no captions, no watermark, no logo, no signage, no flags, no borders.";
   const prompt = "the subject of the photo is " + query + ". " + style +
-    ", sharp focus, high detail, vertical 9:16";
+    ", sharp focus, high detail, vertical 9:16. " + negatives;
   // Deterministic per-item seed: keeps a subject stable across retries but makes
   // near-identical prompts render visibly different images (variety guard).
   const seed = Math.abs(hashStr_(String(contentId) + "|" + query)) % 100000;

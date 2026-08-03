@@ -253,6 +253,9 @@ FORMAT RULES (mandatory):
   feature so no two scenes look alike. Never reuse a generic backdrop (a plain
   "narrow street", "city skyline") across multiple items; if two items would look
   the same on camera, pick a more specific defining subject for each.
+  ORIGIN GROUNDING: if the item has a real-world origin/setting, name it in the
+  query so the image isn't mislocated (e.g. "Oregon creamery blue cheese", not
+  just "blue cheese"; "Kyoto temple garden", not just "temple").
 - No filler phrases ("it's worth noting", "as we can see", "interestingly")
 - Every factual claim must be plausible and specific (real cities/countries/dishes,
   real approximate costs or stats) — flag anything you are not confident about

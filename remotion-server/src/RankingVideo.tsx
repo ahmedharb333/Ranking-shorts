@@ -102,10 +102,17 @@ export type RankingVideoProps = {
 
 const FPS = 30;
 
-// Frames a scene should last to fit its audio, with a floor so silent/short
-// scenes still hold long enough to read. +15 frames of tail padding.
+// A scene lasts exactly its (server-MEASURED) audio length plus a tiny tail so
+// the voiceover never clips at the boundary. The old +15 (0.5s) padding on top
+// of an inflated word-count estimate was creating 15-30% dead air — that's gone;
+// real durations are now measured server-side (server.js) before render.
+const SCENE_TAIL_FRAMES = 3; // ~0.1s breath, not a gap
+// Floors are only a safety net if a duration is missing (measurement failed).
+const HOOK_MIN = 36;   // 1.2s
+const SCENE_MIN = 33;  // 1.1s — enough to register rank + name + metric
+const CTA_MIN = 48;    // 1.6s
 const framesFor = (sec: number | undefined, minFrames: number): number =>
-  Math.max(minFrames, Math.round((sec || 0) * FPS) + 15);
+  Math.max(minFrames, Math.round((sec || 0) * FPS) + SCENE_TAIL_FRAMES);
 
 // ── Rank number that pops in with a spring ────────────────────────────────────
 const RankBadge: React.FC<{ rank: number }> = ({ rank }) => {
@@ -171,7 +178,9 @@ const NameTitle: React.FC<{ name: string }> = ({ name }) => {
   );
 };
 
-// ── Bottom-third animated caption (the on-screen text / fact) ────────────────
+// ── Bottom-third animated caption (the on-screen text / fact). Sits at ~82% of
+//    the 1920 frame (bottom: 340) so it clears the YouTube Shorts / Reels UI
+//    (channel name, title, description) that overlaps the bottom ~12%. ─────────
 const Caption: React.FC<{ text: string }> = ({ text }) => {
   const frame = useCurrentFrame();
   const opacity = interpolate(frame, [0, 10], [0, 1], { extrapolateRight: "clamp" });
@@ -181,7 +190,7 @@ const Caption: React.FC<{ text: string }> = ({ text }) => {
     <div
       style={{
         position: "absolute",
-        bottom: 160,
+        bottom: 340,
         left: 40,
         right: 40,
         opacity,
@@ -303,7 +312,7 @@ const CtaScene: React.FC<{ audioUrl: string; heroSrc?: string; heroType?: string
 
 // ── Top-level composition: stitches hook → scenes (high rank to #1) → CTA ───
 export const RankingVideo: React.FC<RankingVideoProps> = ({ hook, hookAudioUrl, ctaAudioUrl, hookAudioDurationSec, ctaAudioDurationSec, scenes }) => {
-  const hookDurationFrames = framesFor(hookAudioDurationSec, 60); // adapts to the hook voiceover length
+  const hookDurationFrames = framesFor(hookAudioDurationSec, HOOK_MIN); // adapts to the hook voiceover length
   let cursor = hookDurationFrames;
 
   const sorted = scenes.slice().sort((a, b) => b.rank - a.rank); // countdown: #5 first, #1 last
@@ -316,7 +325,7 @@ export const RankingVideo: React.FC<RankingVideoProps> = ({ hook, hookAudioUrl, 
 
   const sceneSequences = sorted
     .map((scene, i) => {
-      const durationFrames = framesFor(scene.audioDurationSec, 60);
+      const durationFrames = framesFor(scene.audioDurationSec, SCENE_MIN);
       const from = cursor;
       cursor += durationFrames;
       // Items revealed so far (this scene included), for the accumulating leaderboard.
@@ -328,7 +337,7 @@ export const RankingVideo: React.FC<RankingVideoProps> = ({ hook, hookAudioUrl, 
       );
     });
 
-  const ctaDurationFrames = framesFor(ctaAudioDurationSec, 90); // adapts to the CTA voiceover length
+  const ctaDurationFrames = framesFor(ctaAudioDurationSec, CTA_MIN); // adapts to the CTA voiceover length
   const ctaFrom = cursor;
 
   return (
@@ -351,9 +360,9 @@ export function computeDurationInFrames(
   hookAudioDurationSec?: number,
   ctaAudioDurationSec?: number
 ): number {
-  const hookFrames = framesFor(hookAudioDurationSec, 60);
-  const ctaFrames = framesFor(ctaAudioDurationSec, 90);
-  const sceneFrames = scenes.reduce((sum, s) => sum + framesFor(s.audioDurationSec, 60), 0);
+  const hookFrames = framesFor(hookAudioDurationSec, HOOK_MIN);
+  const ctaFrames = framesFor(ctaAudioDurationSec, CTA_MIN);
+  const sceneFrames = scenes.reduce((sum, s) => sum + framesFor(s.audioDurationSec, SCENE_MIN), 0);
   return hookFrames + sceneFrames + ctaFrames;
 }
 

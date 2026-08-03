@@ -75,9 +75,11 @@ function synthesizeVoice_(text, contentId) {
   return "https://drive.google.com/uc?id=" + file.getId();
 }
 
-// Rough estimate (~2.5 words/sec spoken) — the Remotion server re-measures the
-// actual mp3 duration server-side and this is only used for sheet visibility.
+// Rough estimate — the Remotion server re-measures the ACTUAL mp3 duration with
+// ffprobe before render, so this is only a sheet-visibility figure and a fallback
+// if that probe fails. ElevenLabs multilingual_v2 reads ~3 words/sec, so use 3.0
+// (2.5 ran long and, before server-side measuring, caused dead air).
 function estimateDurationSec_(text) {
   const words = text.trim().split(/\s+/).length;
-  return Math.round(words / 2.5 * 10) / 10;
+  return Math.round(words / 3.0 * 10) / 10;
 }
