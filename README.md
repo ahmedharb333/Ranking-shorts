@@ -42,11 +42,13 @@ Daily email digest ONLY if something failed — otherwise total silence
 |---|---|
 | `ANTHROPIC_API_KEY` | console.anthropic.com |
 | `PEXELS_API_KEY` | pexels.com/api |
-| `KLING_API_KEY` | klingai.com developer portal |
+| `KLING_ACCESS_KEY` + `KLING_SECRET_KEY` | kling.ai/dev → API application (the AK/SK pair; JWT is signed from both) |
 | `ELEVENLABS_API_KEY` + `ELEVENLABS_VOICE_ID` | elevenlabs.io |
 | `YT_CLIENT_ID` / `YT_CLIENT_SECRET` / `YT_REFRESH_TOKEN` | Google Cloud Console → OAuth (see below) |
 | `ALERT_EMAIL` | your email, for the daily error digest |
 | `REMOTION_SERVER_URL` | set after step 3 |
+| `DRIVE_FOLDER_ID` | your production folder's ID (same as the render server's .env) |
+| `USDA_API_KEY` *(optional)* | api.data.gov — enables USDA food-nutrition grounding |
 
 **YouTube OAuth refresh token (one-time):** create a project in Google Cloud
 Console, enable "YouTube Data API v3", create OAuth Client ID (Desktop app),
