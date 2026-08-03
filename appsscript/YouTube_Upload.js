@@ -42,6 +42,33 @@ function buildSourcesBlock_(scriptRow) {
 }
 
 // ── STAGE 5 — Upload ──────────────────────────────────────────────────────────
+// Next free publish slot as a Date (script timezone), or null if scheduling is
+// off (empty PUBLISH_SLOTS). Skips past/too-soon slots and any already booked.
+function nextPublishSlot_() {
+  if (!PUBLISH_SLOTS || !PUBLISH_SLOTS.length) return null;
+  const tz = Session.getScriptTimeZone();
+  const now = new Date();
+  const bufferMs = 15 * 60 * 1000;                     // publishAt must be safely in the future
+  const offset = Utilities.formatDate(now, tz, "XXX"); // e.g. "+03:00"
+
+  const pub = SpreadsheetApp.getActive().getSheetByName(SHEET.PUBLISHING);
+  const taken = pub ? pub.getDataRange().getValues().slice(1)
+    .map(function (r) { return r[COL_PUBLISHING.PUBLISH_DATE - 1]; })
+    .filter(function (d) { return d instanceof Date; })
+    .map(function (d) { return d.getTime(); }) : [];
+
+  for (var day = 0; day < 5; day++) {
+    const dateStr = Utilities.formatDate(new Date(now.getTime() + day * 86400000), tz, "yyyy-MM-dd");
+    for (var s = 0; s < PUBLISH_SLOTS.length; s++) {
+      const slot = new Date(dateStr + "T" + PUBLISH_SLOTS[s] + ":00" + offset);
+      if (slot.getTime() < now.getTime() + bufferMs) continue;
+      const clash = taken.some(function (t) { return Math.abs(t - slot.getTime()) < 60000; });
+      if (!clash) return slot;
+    }
+  }
+  return null;
+}
+
 // Returns a summary {done, uploaded, alreadyPublished, noMetadata, errors} so the
 // menu can report what happened (the tick ignores the return value).
 function stage5_uploadReadyVideos() {
@@ -61,9 +88,10 @@ function stage5_uploadReadyVideos() {
     if (!meta) { summary.noMetadata++; continue; } // Stage 4.5 hasn't run yet for this one
 
     try {
-      const videoId = uploadToYoutube_(mp4Url, meta);
+      const slot = nextPublishSlot_(); // scheduled go-live time (or null = publish now)
+      const videoId = uploadToYoutube_(mp4Url, meta, slot ? slot.toISOString() : null);
       SpreadsheetApp.getActive().getSheetByName(SHEET.PUBLISHING)
-        .appendRow([scriptId, new Date(), videoId, "", "", "", "", ""]);
+        .appendRow([scriptId, slot || new Date(), videoId, "", "", "", "", ""]);
       summary.uploaded++;
     } catch (err) {
       summary.errors++;
@@ -160,10 +188,16 @@ function suggestRepeatDecisions_(sh) {
   }
 }
 
-function uploadToYoutube_(driveMp4Url, meta) {
+function uploadToYoutube_(driveMp4Url, meta, publishAtIso) {
   const accessToken = getYoutubeAccessToken_();
   const fileId = extractDriveFileId_(driveMp4Url);
   const fileBlob = DriveApp.getFileById(fileId).getBlob();
+
+  // Scheduled: upload private with a publishAt (YouTube auto-publishes then).
+  // Otherwise go public immediately.
+  const status = publishAtIso
+    ? { privacyStatus: "private", publishAt: publishAtIso, selfDeclaredMadeForKids: false }
+    : { privacyStatus: "public", selfDeclaredMadeForKids: false };
 
   const metadata = {
     snippet: {
@@ -171,7 +205,7 @@ function uploadToYoutube_(driveMp4Url, meta) {
       description: meta[COL_YOUTUBE.DESCRIPTION - 1] + "\n\n" + meta[COL_YOUTUBE.HASHTAGS - 1],
       tags: (meta[COL_YOUTUBE.TAGS - 1] || "").split(",").map(function (t) { return t.trim(); })
     },
-    status: { privacyStatus: "public", selfDeclaredMadeForKids: false }
+    status: status
   };
 
   const boundary = "-------rankingshorts" + Utilities.getUuid();

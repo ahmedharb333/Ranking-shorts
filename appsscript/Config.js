@@ -117,6 +117,11 @@ const NICHES = ["Food", "Places", "Countries"];
 const DAILY_TOPICS_PER_NICHE = 2;
 const MAX_PIPELINE_RUNTIME_PER_TICK_MS = 5 * 60 * 1000; // stay under 6-min Apps Script cap
 
+// Spaced publishing: each upload is scheduled to go LIVE at the next free slot
+// (local / script timezone) instead of all at once — better for the algorithm.
+// One slot per expected daily video. Empty array [] = publish immediately.
+const PUBLISH_SLOTS = ["09:00", "11:30", "14:00", "16:30", "19:00", "21:30"];
+
 // ── Google Drive folder structure ─────────────────────────────────────────────
 // All of a video's files live under one per-video folder named by its ID:
 //   <DRIVE_FOLDER_ID>/<contentId>/            clips + audio  (Apps Script)
