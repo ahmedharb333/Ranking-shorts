@@ -92,43 +92,54 @@ function callClaudeWithSearch(finalPrompt, maxSearches) {
 
   for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
     try {
-      const payload = {
-        model: ANTHROPIC_MODEL,
-        max_tokens: 4000,
-        system: [{ type: "text", text: SYSTEM_CONTEXT, cache_control: { type: "ephemeral" } }],
-        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: maxSearches || 8 }],
-        messages: [{ role: "user", content: finalPrompt }]
-      };
+      // A web_search turn can return stop_reason "pause_turn" — the model paused
+      // mid-search and we must send the conversation back to continue. Loop until
+      // it finishes (end_turn), accumulating the final text.
+      const messages = [{ role: "user", content: finalPrompt }];
+      let text = "";
+      let httpError = "";
 
-      const res = UrlFetchApp.fetch(ANTHROPIC_API_URL, {
-        method: "post",
-        contentType: "application/json",
-        headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
-        payload: JSON.stringify(payload),
-        muteHttpExceptions: true
-      });
+      for (let step = 0; step < 6; step++) {
+        const payload = {
+          model: ANTHROPIC_MODEL,
+          max_tokens: 8000, // room for search reasoning + the full JSON answer
+          system: [{ type: "text", text: SYSTEM_CONTEXT, cache_control: { type: "ephemeral" } }],
+          tools: [{ type: "web_search_20250305", name: "web_search", max_uses: maxSearches || 5 }],
+          messages: messages
+        };
+        const res = UrlFetchApp.fetch(ANTHROPIC_API_URL, {
+          method: "post",
+          contentType: "application/json",
+          headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+          payload: JSON.stringify(payload),
+          muteHttpExceptions: true
+        });
+        const code = res.getResponseCode();
+        const body = res.getContentText();
+        if (code === 429) { Utilities.sleep(15000); httpError = "rate limited"; break; }
+        if (code !== 200) { httpError = "HTTP " + code + ": " + body.slice(0, 300); break; }
 
-      const code = res.getResponseCode();
-      const body = res.getContentText();
+        const data = JSON.parse(body);
+        const blocks = data.content || [];
+        const t = blocks
+          .filter(function (b) { return b.type === "text" && b.text; })
+          .map(function (b) { return b.text; })
+          .join("\n").trim();
+        if (t) text = t;
 
-      if (code === 429) { Utilities.sleep(15000); continue; }
-      if (code !== 200) { lastError = "HTTP " + code + ": " + body.slice(0, 500); Utilities.sleep(RETRY_WAIT_MS); continue; }
+        if (data.stop_reason === "pause_turn") {
+          messages.push({ role: "assistant", content: blocks }); // continue the search
+          continue;
+        }
+        break; // end_turn (or other) — done
+      }
 
-      const data = JSON.parse(body);
-      // web_search is a server tool; the model may interleave tool-result blocks
-      // with text. The JSON answer is in the text blocks — concatenate them.
-      const text = (data.content || [])
-        .filter(function (b) { return b.type === "text" && b.text; })
-        .map(function (b) { return b.text; })
-        .join("\n")
-        .trim();
-      if (!text) { lastError = "Empty text from Claude (search)"; Utilities.sleep(RETRY_WAIT_MS); continue; }
-      return text;
-
+      if (text) return text;
+      lastError = httpError || "Empty text from Claude (search)";
     } catch (err) {
       lastError = err.message;
-      Utilities.sleep(RETRY_WAIT_MS);
     }
+    Utilities.sleep(RETRY_WAIT_MS);
   }
 
   throw new Error("callClaudeWithSearch failed after " + MAX_TRIES + " attempts: " + lastError);
