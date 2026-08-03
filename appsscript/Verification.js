@@ -65,30 +65,37 @@ function stage1b_verifyFacts(scriptId) {
       "For EACH item, use web search to verify the claim. Rules:\n" +
       "- If accurate, keep it but correct any numbers to a reputable, current source.\n" +
       "- If wrong, outdated, or unsourceable, REPLACE it with a DIFFERENT, specific, verifiable fact about the same item.\n" +
-      "- Every item MUST include a real source URL you actually consulted." + tail;
+      "- Every item MUST include a real source URL you actually consulted.\n" +
+      "- CRITICAL — keep the RANKING internally consistent: the video ranks items by ONE metric (e.g. price). After correcting values, SORT the items by that metric so rank 1 is the MOST extreme (e.g. most expensive) and renumber ranks 1..N accordingly. If a corrected value no longer fits the ranking premise (e.g. it's actually cheap in a 'most expensive' list), REPLACE that item with a different verifiable one that DOES fit, so the numbers never contradict the rank order." + tail;
 
   try {
     const raw = callClaudeWithSearch(prompt, 5); // cap web searches so verification stays well under Apps Script's 6-min limit
     const parsed = JSON.parse(extractJsonObject_(raw));
     if (!parsed.items || !parsed.items.length) throw new Error("Verifier returned no items");
 
-    // Merge verified fields back onto the original items, matched by rank.
-    const byRank = {};
-    parsed.items.forEach(function (v) { byRank[v.rank] = v; });
-    const verified = rankItems.map(function (it) {
-      const v = byRank[it.rank];
-      if (!v) throw new Error("Verifier skipped rank " + it.rank);
-      const hasSource = v.source && /^https?:\/\//.test(v.source);
-      // Non-perspective items must be sourced; perspective opinions may be empty.
-      if (!isPerspective && !hasSource) throw new Error("Missing source for rank " + it.rank);
-      return {
-        rank: it.rank,
-        name: v.name || it.name,
-        fact: v.fact || it.fact,
-        on_screen_text: v.on_screen_text || it.on_screen_text || "",
-        source: hasSource ? v.source : ""
-      };
-    });
+    // Trust the verifier's (possibly re-ranked/replaced) items so the ranking
+    // stays consistent. Validate, drop unsourced non-perspective items, sort by
+    // the verifier's rank, then renumber 1..N to close any gaps.
+    const verified = parsed.items
+      .filter(function (v) { return v && v.name && v.fact; })
+      .map(function (v) {
+        const hasSource = v.source && /^https?:\/\//.test(v.source);
+        if (!isPerspective && !hasSource) return null; // sourced facts required
+        return {
+          rank: Number(v.rank) || 999,
+          name: v.name,
+          fact: v.fact,
+          on_screen_text: v.on_screen_text || "",
+          source: hasSource ? v.source : ""
+        };
+      })
+      .filter(function (x) { return x; })
+      .sort(function (a, b) { return a.rank - b.rank; });
+
+    if (verified.length < Math.min(3, rankItems.length)) {
+      throw new Error("Too few verified items (" + verified.length + " of " + rankItems.length + ")");
+    }
+    verified.forEach(function (it, i) { it.rank = i + 1; }); // renumber #1..#N, #1 = most extreme
 
     sh.getRange(rowIdx, COL_SCRIPT.RANK_ITEMS_JSON).setValue(JSON.stringify(verified));
     sh.getRange(rowIdx, COL_SCRIPT.STATUS).setValue("Verified");

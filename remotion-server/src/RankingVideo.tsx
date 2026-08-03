@@ -149,8 +149,39 @@ const Caption: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
-// ── One ranked item: background clip + rank badge + caption + synced audio ──
-const RankScene: React.FC<{ scene: Scene }> = ({ scene }) => (
+// Drops "(...)" qualifiers so leaderboard rows stay compact.
+const shortName = (n: string): string => n.replace(/\s*\(.*?\)\s*/g, " ").replace(/\s+/g, " ").trim();
+
+// ── Accumulating leaderboard: the items revealed so far, so viewers always see
+//    the full ranking building up. The current item is highlighted. ───────────
+const Leaderboard: React.FC<{ items: { rank: number; name: string }[]; currentRank: number }> = ({ items, currentRank }) => (
+  <div style={{ position: "absolute", top: 470, right: 22, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
+    {items.map((it) => {
+      const active = it.rank === currentRank;
+      return (
+        <div
+          key={it.rank}
+          style={{
+            display: "flex", alignItems: "center", gap: 10, maxWidth: 560,
+            background: active ? "rgba(255,196,0,0.95)" : "rgba(0,0,0,0.55)",
+            color: active ? "#111" : "#fff",
+            fontFamily: "Arial, sans-serif",
+            fontWeight: active ? 900 : 700,
+            fontSize: active ? 40 : 32,
+            padding: active ? "8px 18px" : "6px 14px",
+            borderRadius: 14,
+          }}
+        >
+          <span style={{ fontWeight: 900 }}>#{it.rank}</span>
+          <span style={{ minWidth: 0, maxWidth: 440, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{shortName(it.name)}</span>
+        </div>
+      );
+    })}
+  </div>
+);
+
+// ── One ranked item: background clip + rank badge + caption + leaderboard + audio ──
+const RankScene: React.FC<{ scene: Scene; revealed: { rank: number; name: string }[] }> = ({ scene, revealed }) => (
   <AbsoluteFill style={{ backgroundColor: "black" }}>
     {scene.clipUrl ? (
       scene.mediaType === "image"
@@ -159,6 +190,7 @@ const RankScene: React.FC<{ scene: Scene }> = ({ scene }) => (
     ) : null}
     <RankBadge rank={scene.rank} />
     {scene.name ? <NameTitle name={scene.name} /> : null}
+    <Leaderboard items={revealed} currentRank={scene.rank} />
     <Caption text={scene.onScreenText} />
     {scene.audioUrl ? <Audio src={scene.audioUrl} /> : null}
   </AbsoluteFill>
@@ -202,16 +234,17 @@ export const RankingVideo: React.FC<RankingVideoProps> = ({ hook, hookAudioUrl, 
   const hookDurationFrames = framesFor(hookAudioDurationSec, 60); // adapts to the hook voiceover length
   let cursor = hookDurationFrames;
 
-  const sceneSequences = scenes
-    .slice()
-    .sort((a, b) => b.rank - a.rank) // countdown: highest number first, #1 last
-    .map((scene) => {
+  const sorted = scenes.slice().sort((a, b) => b.rank - a.rank); // countdown: #5 first, #1 last
+  const sceneSequences = sorted
+    .map((scene, i) => {
       const durationFrames = framesFor(scene.audioDurationSec, 60);
       const from = cursor;
       cursor += durationFrames;
+      // Items revealed so far (this scene included), for the accumulating leaderboard.
+      const revealed = sorted.slice(0, i + 1).map((s) => ({ rank: s.rank, name: s.name }));
       return (
         <Sequence key={scene.rank} from={from} durationInFrames={durationFrames}>
-          <RankScene scene={scene} />
+          <RankScene scene={scene} revealed={revealed} />
         </Sequence>
       );
     });
