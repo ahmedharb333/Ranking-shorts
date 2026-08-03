@@ -112,9 +112,10 @@ function menu_generateForActiveRow_() {
     : "⚠️ Script generation failed for '" + idea.title + "' — check the Error Log tab.");
 }
 
-// Resets every "Verify Failed" script back to "Ready" and clears its retry
-// marker, so they get a fresh set of verification attempts on the next ticks.
-function menu_resetVerifyFailed_() {
+// Flips every "Verify Failed" script back to "Ready" and clears its retry
+// marker (fresh set of attempts). Returns how many were reset. Used by the menu
+// AND by the daily job so parked scripts keep hunting for new sources on their own.
+function resetVerifyFailedToReady_() {
   const sh = SpreadsheetApp.getActive().getSheetByName(SHEET.SCRIPT);
   const data = sh.getDataRange().getValues();
   let n = 0;
@@ -125,6 +126,11 @@ function menu_resetVerifyFailed_() {
       n++;
     }
   }
+  return n;
+}
+
+function menu_resetVerifyFailed_() {
+  const n = resetVerifyFailedToReady_();
   SpreadsheetApp.getUi().alert(n
     ? "Reset " + n + " 'Verify Failed' script(s) to 'Ready'. They'll be re-verified (fresh sources) on the next ticks."
     : "No 'Verify Failed' scripts to reset.");

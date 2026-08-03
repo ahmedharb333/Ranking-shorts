@@ -122,6 +122,10 @@ function forEachAudioReadyScript_(fn) {
 
 // ── The ONLY thing that reaches you: a daily digest, not a per-video ping ────
 function dailyErrorDigest() {
+  // Give any parked "Verify Failed" scripts a fresh set of attempts each day —
+  // new sources may exist online now, so the pipeline keeps healing itself.
+  resetVerifyFailedToReady_();
+
   const sh = SpreadsheetApp.getActive().getSheetByName(SHEET.ERROR_LOG);
   const rows = sh.getDataRange().getValues().slice(1)
     .filter(function (r) { return r[COL_ERROR.RESOLVED - 1] !== "YES"; });
