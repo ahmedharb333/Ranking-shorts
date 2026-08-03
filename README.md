@@ -102,5 +102,7 @@ That's it — it now ticks every 15 minutes on its own.
 - `Config.js` → `VIDEOS_PER_DAY` and the trigger interval in `Triggers.js`
   (`everyMinutes(15)`) control throughput. Tighten the interval or raise the
   per-tick stage count to push past 4-5/day once you trust it.
-- `Config.js` → `AI_VIDEO_FOR_RANK_1_ONLY` controls the Pexels/Kling mix —
-  set to `false` to use Kling for every item (higher cost, more unique look).
+- `Config.js` → `VIDEO_MODE` controls the Pexels/Kling mix:
+  `"none"` = all Pexels stock (cheapest), `"hero"` = Kling AI video for #1 only
+  + Pexels for the rest (balanced, default), `"all"` = Kling for every item
+  (most unique look, best for luxury/novelty topics; higher cost + slower).

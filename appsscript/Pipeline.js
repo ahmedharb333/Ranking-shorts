@@ -142,10 +142,10 @@ function stage2_buildVisualPlan(scriptId) {
   const visualSh = SpreadsheetApp.getActive().getSheetByName(SHEET.VISUAL);
 
   rankItems.forEach(function (item, idx) {
-    const isHero = AI_VIDEO_FOR_RANK_1_ONLY && item.rank === 1;
+    const useKling = VIDEO_MODE === "all" || (VIDEO_MODE === "hero" && item.rank === 1);
     visualSh.appendRow([
       scriptId, idx, item.name + " " + (item.on_screen_text || ""),
-      isHero ? "kling" : "pexels", "", "", "Queued", ""
+      useKling ? "kling" : "pexels", "", "", "Queued", ""
     ]);
   });
   return true;

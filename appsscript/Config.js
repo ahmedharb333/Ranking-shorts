@@ -142,9 +142,13 @@ const KLING_API_URL        = "https://api.klingai.com/v1/videos/text2video";
 const KLING_MODEL          = "kling-v2";
 const KLING_POLL_INTERVAL  = 15000;
 const KLING_MAX_POLLS      = 40;
-// Mix-mode rule: item ranks use Pexels; ONLY the #1 reveal scene uses Kling/Veo,
-// to control cost while still giving the "wow" hero shot AI video is good for.
-const AI_VIDEO_FOR_RANK_1_ONLY = false;
+// Visual source mode — controls the Pexels/Kling mix:
+//   "none" — every item uses Pexels stock (cheapest; weak for luxury/novelty items)
+//   "hero" — Kling AI video for #1 only, Pexels for the rest (balanced; the #1
+//            "wow" reveal is AI-generated so it can match a specific/luxury item)
+//   "all"  — Kling AI video for EVERY item (most unique look + best match for
+//            hard-to-stock topics; highest cost + slowest, all clips are async)
+const VIDEO_MODE = "hero";
 
 // ── YouTube Data API ──────────────────────────────────────────────────────────
 const YOUTUBE_UPLOAD_URL = "https://www.googleapis.com/upload/youtube/v3/videos";
@@ -186,12 +190,19 @@ ANGLES (each video has one):
 
 FORMAT RULES (mandatory):
 - Total spoken script: 120-160 words, 30-45 seconds read aloud
-- Hook (first 1.5 seconds / first line) must state the single most surprising fact
-  or claim in the video, phrased so it works even with sound off (on-screen text
-  must carry the same meaning as the spoken hook)
-- Structure: Hook → ranked items (usually 5, countdown from #5 to #1, OR build-up
-  to #1) → each item gets ONE punchy fact/stat, never generic description →
-  closing line that either teases a follow-up or asks a direct question for comments
+- RANKING METRIC: choose exactly ONE measurable metric up front (e.g. price in
+  USD, Scoville units, cost index) and sort EVERY item by it consistently. #1 is
+  the extreme end of that metric (the highest / most). Each item's "fact" states
+  that item's value for the metric with a specific number, so the numbers never
+  contradict the rank order (a lower-ranked item must not out-number #1).
+- HOOK (first 1.5s / first line): state the single most surprising fact, and it
+  MUST be about the #1 item. The headline number in the hook must EQUAL the #1
+  item's metric value (or another number that actually appears in the ranking).
+  NEVER promise a number that no ranked item delivers. It must work with sound
+  off (on-screen text carries the same meaning as the spoken hook).
+- Structure: Hook → ranked items (5, countdown #5→#1) → each item gets ONE punchy
+  fact = its metric value, never generic description → closing line that teases a
+  follow-up or asks a direct question for comments
 - No filler phrases ("it's worth noting", "as we can see", "interestingly")
 - Every factual claim must be plausible and specific (real cities/countries/dishes,
   real approximate costs or stats) — flag anything you are not confident about
@@ -208,6 +219,9 @@ OUTPUT FORMAT: respond with strict JSON only, matching this shape:
   "quality_check": {
     "word_count": 0,
     "hook_works_muted": true,
+    "ranking_metric": "the single metric used to sort, e.g. price in USD",
+    "sorted_by_metric": true,
+    "hook_number_matches_rank1": true,
     "facts_flagged_unverified": []
   }
 }`;
