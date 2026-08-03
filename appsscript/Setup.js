@@ -30,6 +30,7 @@ function onOpen() {
       .addItem("0 · Refill topic queue", "stage0_refillTopicQueue")
       .addItem("1 · Generate next script", "menu_stage1_")
       .addItem("1.5 · Verify next script (web search)", "stage1b_verifyReadyScripts")
+      .addItem("↺ Reset failed verifications → Ready", "menu_resetVerifyFailed_")
       .addItem("2 · Build visual plans", "menu_stage2Plans_")
       .addItem("2B · Resolve visuals (Pexels/Kling)", "stage2b_resolveVisuals")
       .addItem("3 · Generate voiceover", "menu_stage3_")
@@ -109,6 +110,24 @@ function menu_generateForActiveRow_() {
   ui.alert(ok
     ? "✅ Script generated for '" + idea.title + "'.\n\nIt will now flow through verify → visuals → voiceover → render on the next ticks (or push it with 'Run one stage')."
     : "⚠️ Script generation failed for '" + idea.title + "' — check the Error Log tab.");
+}
+
+// Resets every "Verify Failed" script back to "Ready" and clears its retry
+// marker, so they get a fresh set of verification attempts on the next ticks.
+function menu_resetVerifyFailed_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(SHEET.SCRIPT);
+  const data = sh.getDataRange().getValues();
+  let n = 0;
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][COL_SCRIPT.STATUS - 1]) === "Verify Failed") {
+      sh.getRange(i + 1, COL_SCRIPT.STATUS).setValue("Ready");
+      sh.getRange(i + 1, COL_SCRIPT.NOTE).setValue("");
+      n++;
+    }
+  }
+  SpreadsheetApp.getUi().alert(n
+    ? "Reset " + n + " 'Verify Failed' script(s) to 'Ready'. They'll be re-verified (fresh sources) on the next ticks."
+    : "No 'Verify Failed' scripts to reset.");
 }
 
 // ── Manual controls ──────────────────────────────────────────────────────────
