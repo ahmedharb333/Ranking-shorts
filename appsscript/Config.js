@@ -231,6 +231,11 @@ FORMAT RULES (mandatory):
   item's metric value (or another number that actually appears in the ranking).
   NEVER promise a number that no ranked item delivers. It must work with sound
   off (on-screen text carries the same meaning as the spoken hook).
+- ON-SCREEN TEXT (on_screen_text): show ONLY that item's metric value with its
+  unit — nothing else. No item name, no filler words, no trailing clause. Max 4
+  words. GOOD: "$12,195 / month", "2.2M SHU", "$50 / lb", "1,200 years old".
+  BANNED: "$1,000/month required", "$157 a night, nightlife", "$50/lb Horse
+  Cheese", "$1,000/month in Thailand" — the metric is a clean number + unit only.
 - Structure: Hook → ranked items (5, countdown #5→#1) → each item gets ONE punchy
   fact = its metric value, never generic description → closing line that teases a
   follow-up or asks a direct question for comments
@@ -242,7 +247,12 @@ FORMAT RULES (mandatory):
   numbers mislead the search — "peak" once returned a mountain).
   E.g. "Pepper X Wings" -> "chicken wings, fiery red sauce, close-up";
   "Tonkotsu Ramen" -> "ramen bowl, pork broth, close-up";
-  "Underrated Lisbon neighborhood" -> "Lisbon old town street, colorful tiles".
+  "Chiado, Lisbon" -> "Chiado Lisbon plaza, historic tram".
+  DISTINCTNESS (critical): the five queries must be VISUALLY DIFFERENT from each
+  other — key each on that item's most ICONIC, recognizable landmark or defining
+  feature so no two scenes look alike. Never reuse a generic backdrop (a plain
+  "narrow street", "city skyline") across multiple items; if two items would look
+  the same on camera, pick a more specific defining subject for each.
 - No filler phrases ("it's worth noting", "as we can see", "interestingly")
 - Every factual claim must be plausible and specific (real cities/countries/dishes,
   real approximate costs or stats) — flag anything you are not confident about

@@ -68,6 +68,11 @@ function stage0_refillTopicQueue() {
       winnerBlock + trendBlock +
       "Avoid these already-used titles — do NOT repeat OR reword them:\n" + avoid.join("\n") + "\n" +
       "Avoid these killed/underperforming topics too:\n" + killed.join("\n") + "\n" +
+      "VISUAL DIVERSITY (required): each topic's 5 ranked items must look CLEARLY " +
+      "DIFFERENT on screen. Do NOT propose lists where every item is a " +
+      "neighborhood/district/area of ONE city (they render as near-identical " +
+      "streets) — spread items across different cities, regions, or countries so " +
+      "each has its own distinct, recognizable imagery.\n" +
       "Return strict JSON: {\"topics\":[{\"title\":\"...\",\"angle\":\"countdown|comparison|myth-bust|perspective\"}]}";
 
     try {
@@ -81,6 +86,8 @@ function stage0_refillTopicQueue() {
       });
       // 2) semantic dedup — catch reworded / same-idea repeats
       candidates = filterSemanticDuplicates_(candidates, avoid);
+      // 2b) drop visually monotonous topics (single-city neighborhood lists)
+      candidates = candidates.filter(function (t) { return !isVisuallyMonotonous_(t.title); });
 
       // 3) queue the survivors, capped to today's remaining quota for this niche
       candidates.slice(0, remaining).forEach(function (t) {
@@ -122,6 +129,15 @@ function filterSemanticDuplicates_(candidates, existingTitles) {
 // Normalizes a title for duplicate comparison: lowercase, punctuation stripped.
 function normalizeTitle_(t) {
   return String(t || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+// Rejects visually monotonous topics: a ranking of neighborhoods / districts /
+// boroughs of a SINGLE city renders as five near-identical streets (the exact
+// "5 alleys" problem we saw). Spread-out lists (cities, regions, countries) pass.
+function isVisuallyMonotonous_(title) {
+  const t = String(title || "").toLowerCase();
+  return /\b(neighbou?rhoods?|districts?|boroughs?|quarters?|barrios?|suburbs?)\b/.test(t)
+      && /\b(in|of|around|within)\b/.test(t);
 }
 
 // Maps content ID -> title (Script Bank title preferred, else Idea working title).
@@ -256,6 +272,7 @@ function stage2_buildVisualPlan(scriptId) {
   const visualSh = SpreadsheetApp.getActive().getSheetByName(SHEET.VISUAL);
 
   const videoMode = getVideoMode_();
+  const usedQueries = {}; // variety guard: no two items get the same image query
   rankItems.forEach(function (item, idx) {
     const isTop = item.rank === 1;
     let source = "pexels";
@@ -263,7 +280,13 @@ function stage2_buildVisualPlan(scriptId) {
     else if (videoMode === "ai-image-all" || (videoMode === "ai-image" && isTop)) source = "aiimage";
     // Clean, stock/AI-friendly visual query (never numbers/captions, which
     // returned mountains for "Carolina Reaper Wings 2.2M SHU peak").
-    const query = cleanVisualQuery_(item.search_query || item.name);
+    let query = cleanVisualQuery_(item.search_query || item.name);
+    // If two items resolve to the same query their scenes look identical — fold
+    // the item's own name in to force a distinct image (the "5 alleys" problem).
+    if (usedQueries[query.toLowerCase()] && item.name) {
+      query = cleanVisualQuery_(item.name + " " + query);
+    }
+    usedQueries[query.toLowerCase()] = true;
     visualSh.appendRow([scriptId, idx, query, source, "", "", "Queued", ""]);
   });
   return true;

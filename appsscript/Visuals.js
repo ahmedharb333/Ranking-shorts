@@ -64,12 +64,22 @@ function fetchPexelsClip_(query, contentId) {
 // saves it to Drive; the composition applies a slow Ken Burns zoom so it reads
 // as motion b-roll. Great for luxury/novelty subjects Pexels can't cover.
 function fetchAiImage_(query, contentId) {
-  // Subject first (so the model renders the literal item), then a niche-neutral
-  // realistic style. "subject of the photo is" keeps the main noun dominant.
-  const prompt = "the subject of the photo is " + query +
-    ". photorealistic, sharp focus, high detail, professional photography, natural lighting, vertical 9:16";
+  // Subject first (so the model renders the literal item), then a niche-tuned
+  // style so food looks like food photography and places look like travel shots.
+  const niche = nicheFolderName_(contentId); // Food / Places / Countries / Other
+  const styleByNiche = {
+    Food: "professional food photography, appetizing, close-up, shallow depth of field",
+    Places: "travel destination photography, iconic recognizable landmark, golden hour light",
+    Countries: "iconic recognizable scenery of the place, cinematic wide establishing shot",
+  };
+  const style = styleByNiche[niche] || "photorealistic, professional photography, natural lighting";
+  const prompt = "the subject of the photo is " + query + ". " + style +
+    ", sharp focus, high detail, vertical 9:16";
+  // Deterministic per-item seed: keeps a subject stable across retries but makes
+  // near-identical prompts render visibly different images (variety guard).
+  const seed = Math.abs(hashStr_(String(contentId) + "|" + query)) % 100000;
   const url = "https://image.pollinations.ai/prompt/" + encodeURIComponent(prompt) +
-    "?width=1080&height=1920&nologo=true&model=flux";
+    "?width=1080&height=1920&nologo=true&model=flux&seed=" + seed;
 
   // One validated Pollinations attempt (it occasionally returns a bad/empty body
   // that would break the render); on any problem, fall straight to Pexels to
@@ -199,6 +209,14 @@ function getContentFolder_(contentId) {
 function getOrCreateChildFolder_(parent, name) {
   const it = parent.getFoldersByName(name);
   return it.hasNext() ? it.next() : parent.createFolder(name);
+}
+
+// Small deterministic string hash (for stable per-item AI image seeds).
+function hashStr_(s) {
+  let h = 0;
+  s = String(s);
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return h;
 }
 
 // Niche folder name from the contentId prefix (food-.. / places-.. / countries-..).

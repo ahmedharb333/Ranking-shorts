@@ -55,8 +55,9 @@ function stage1b_verifyFacts(scriptId) {
 
   const head = "You are fact-checking a ranking video BEFORE publication.\n\n" + grounding + "Items:\n" + JSON.stringify(lean) + "\n\n";
   const tail =
-    "\nEach 'fact' <= 14 words, no filler, no [VERIFY] tags. 'on_screen_text' <= 6 words.\n" +
-    "Each item also needs a clean 'search_query' (3-6 words) — the ACTUAL food/place/object to show on screen for stock/AI visuals, NO numbers, NO units, NO obscure brand names (e.g. 'close-up spicy chicken wings'). Rewrite it for any item you replace.\n" +
+    "\nEach 'fact' <= 14 words, no filler, no [VERIFY] tags.\n" +
+    "'on_screen_text' = ONLY that item's metric value + unit, <= 4 words, NO item name, NO trailing words ('required'/'minimum'/'per night'), NO comma clause. GOOD: '$12,195 / month', '2.2M SHU'. BAD: '$1,000/month required', '$157 a night, nightlife'.\n" +
+    "Each item also needs a clean 'search_query' (3-6 words) — the ACTUAL food/place/object to show on screen, keyed on that item's most ICONIC recognizable feature so the five images look CLEARLY DIFFERENT from each other; NO numbers, NO units, NO obscure brand names (e.g. 'close-up spicy chicken wings'). Rewrite it for any item you replace.\n" +
     "ALSO return an updated 'hook' — one punchy line that works muted, ABOUT the FINAL #1 item, using ITS verified number, so the hook can never contradict the ranking.\n" +
     "Respond with ONLY strict JSON as your final message (no prose, no code fences):\n" +
     '{"hook":"...","items":[{"rank":N,"name":"...","fact":"...","on_screen_text":"...","search_query":"...","source":"https://..."}]}';
@@ -92,7 +93,7 @@ function stage1b_verifyFacts(scriptId) {
           rank: Number(v.rank) || 999,
           name: v.name,
           fact: v.fact,
-          on_screen_text: v.on_screen_text || "",
+          on_screen_text: cleanMetric_(v.on_screen_text || "", v.name), // enforce clean number+unit
           search_query: v.search_query || v.name,
           source: hasSource ? v.source : ""
         };
@@ -130,6 +131,30 @@ function stage1b_verifyFacts(scriptId) {
     }
     return false;
   }
+}
+
+// Safety net for the on-screen metric: even with a tightened prompt, the model
+// sometimes appends a qualifier. Reduce it to a clean number + unit:
+//   "$1,000/month required"      -> "$1,000/month"
+//   "$157 a night, nightlife"    -> "$157 a night"
+//   "$1,000/month in Thailand"   -> "$1,000/month"     (name stripped)
+//   "$50/lb Horse Cheese"        -> "$50/lb"            (trailing words stripped)
+function cleanMetric_(text, name) {
+  const original = String(text || "").trim();
+  // Split on a clause comma (", word") or ";"/"(", but NOT the thousands comma
+  // inside a number like "$1,000" (comma directly followed by a digit).
+  let s = original.split(/,\s+|[;(]/)[0].trim();                   // drop ", nightlife" / "(...)"
+  if (name) {                                                       // drop "... in Thailand" / "... Thailand"
+    s = s.replace(new RegExp("\\s+(in|for|at|of|to|per)?\\s*" + escapeRegExp_(String(name).trim()) + "\\s*$", "i"), "").trim();
+  }
+  // Strip trailing filler that isn't part of a number+unit metric.
+  s = s.replace(/\s+\b(required|minimum|min|needed|only|per person|each|approx\.?|about)\b\.?$/i, "").trim();
+  s = s.replace(/[\s\-–—:]+$/, "").trim();
+  return s || original; // never blank it out
+}
+
+function escapeRegExp_(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 // Row NUMBER (1-based) for a given id, or -1. (findRowById_ returns the row
